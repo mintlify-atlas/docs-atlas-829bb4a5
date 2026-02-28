@@ -40,20 +40,20 @@ After initial setup, GitNexus operates **completely offline**.
 
 **Per-Repository Index:**
 
-```
+```text
 my-project/.gitnexus/
 ├── graph.kuzu          # Your code graph (stays in your repo)
 ├── graph.kuzu.wal      # Database write-ahead log
 ├── graph.kuzu.lock     # Database lock file
 └── meta.json           # Index metadata (commit hash, stats)
-```
+```text
 
 **Global Registry:**
 
-```
+```text
 ~/.gitnexus/
 └── registry.json       # List of indexed repos (paths only)
-```
+```text
 
 The global registry contains **only file paths and metadata** - no code content.
 
@@ -64,7 +64,7 @@ GitNexus **automatically adds** `.gitnexus/` to your `.gitignore`:
 ```bash
 # Added by gitnexus analyze
 .gitnexus/
-```
+```text
 
 This prevents accidentally committing:
 
@@ -100,7 +100,7 @@ Run GitNexus locally and connect the web UI:
 
 ```bash
 gitnexus serve
-```
+```text
 
 This starts a **local HTTP server** (default: `http://localhost:3000`).
 
@@ -126,7 +126,7 @@ The web UI supports **optional AI chat** via OpenAI/Anthropic APIs:
 
 ```javascript
 localStorage.setItem('openai_api_key', 'sk-...')
-```
+```text
 
 **Never stored on disk or transmitted to GitNexus.**
 
@@ -138,7 +138,7 @@ Remove keys from browser:
 // In browser console
 localStorage.removeItem('openai_api_key')
 localStorage.removeItem('anthropic_api_key')
-```
+```text
 
 Or clear all site data via browser settings.
 
@@ -191,7 +191,7 @@ If you accidentally committed `.gitnexus/`:
 # Remove from git history
 git rm -r --cached .gitnexus/
 git commit -m "Remove .gitnexus from version control"
-```
+```text
 
 ### Avoid Indexing Secrets
 
@@ -221,7 +221,7 @@ If you need stricter access control:
 
 ```bash
 chmod 700 .gitnexus/
-```
+```text
 
 ## Open Source Transparency
 

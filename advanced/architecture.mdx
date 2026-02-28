@@ -9,7 +9,7 @@ GitNexus is a **graph-powered code intelligence system** that transforms source 
 
 ### Architecture Diagram
 
-```
+```text
 ┌─────────────────┐
 │  Source Code    │
 └────────┬────────┘
@@ -41,7 +41,7 @@ GitNexus is a **graph-powered code intelligence system** that transforms source 
          │  MCP Server   │
          │  HTTP API     │
          └───────────────┘
-```
+```text
 
 ## Tech Stack
 
@@ -280,7 +280,7 @@ Output: ~20-300 processes per repo (dynamic limit based on size)
 
 Each repository stores its index in `.gitnexus/`:
 
-```
+```text
 my-project/
 ├── .gitnexus/
 │   ├── graph.kuzu          # KuzuDB database file
@@ -289,14 +289,14 @@ my-project/
 │   └── meta.json           # Index metadata
 ├── AGENTS.md               # GitNexus context for AI agents
 └── CLAUDE.md               # Claude-specific context
-```
+```text
 
 **Global Registry** (`~/.gitnexus/`):
 
-```
+```text
 ~/.gitnexus/
 └── registry.json           # List of all indexed repos
-```
+```text
 
 ### Web Storage (Browser)
 
@@ -320,7 +320,7 @@ GitNexus uses **3-tier ranking**:
 
 ```javascript
 RRF_score = Σ (1 / (k + rank_i))
-```
+```text
 
 Where `k = 60` (standard RRF constant).
 
@@ -338,7 +338,7 @@ The **Model Context Protocol server** runs via stdio:
 
 ```bash
 npx gitnexus mcp
-```
+```text
 
 **Multi-Repo Support:**
 
@@ -361,7 +361,7 @@ Run a local server for the web UI:
 
 ```bash
 gitnexus serve
-```
+```text
 
 Provides REST endpoints:
 

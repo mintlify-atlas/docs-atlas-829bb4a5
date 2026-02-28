@@ -1,0 +1,185 @@
+---
+title: gitnexus eval-server
+description: Lightweight HTTP server for fast tool calls during evaluation
+---
+
+## Overview
+
+The `eval-server` command starts a persistent HTTP daemon designed for benchmark evaluation environments like SWE-bench. It provides a faster alternative to the MCP server by eliminating process startup overhead for repeated tool calls.
+
+<Info>
+This command is designed for automated evaluation and benchmarking, not for normal development usage. For development, use the standard MCP server via `gitnexus mcp`.
+</Info>
+
+## Syntax
+
+```bash
+gitnexus eval-server [options]
+```
+
+## Options
+
+<ParamField path="--port" type="number" default="4848">
+  Port number for the HTTP server.
+  
+  Default: `4848`
+</ParamField>
+
+<ParamField path="--idle-timeout" type="number" default="0">
+  Auto-shutdown after N seconds of inactivity.
+  
+  - `0` = disabled (server runs indefinitely)
+  - Useful for resource cleanup in CI/CD environments
+  
+  Default: `0` (disabled)
+</ParamField>
+
+## Use cases
+
+### SWE-bench evaluation
+
+When running GitNexus in automated benchmarks:
+
+```bash
+# Start persistent server
+gitnexus eval-server --port 4848 --idle-timeout 300
+
+# Evaluation script makes HTTP calls instead of spawning processes
+curl -X POST http://localhost:4848/query -d '{"query": "auth"}'
+```
+
+Benefits:
+- **50-100x faster** than spawning new processes for each tool call
+- Persistent KuzuDB connections (no reconnect overhead)
+- Shared memory for indexes
+- Auto-cleanup with idle timeout
+
+### CI/CD integration
+
+In continuous integration pipelines:
+
+```bash
+# Start server with auto-shutdown
+gitnexus eval-server --idle-timeout 60
+
+# Run tests that call GitNexus tools
+npm test
+
+# Server auto-shuts down after 60s of no requests
+```
+
+### Performance testing
+
+Benchmark GitNexus tool performance:
+
+```bash
+# Start server
+gitnexus eval-server
+
+# Run performance tests
+ab -n 1000 -c 10 http://localhost:4848/query
+
+# Stop server
+curl -X POST http://localhost:4848/shutdown
+```
+
+## HTTP API
+
+The eval server exposes the same tools as the MCP server, but via HTTP:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/query` | POST | Process-grouped hybrid search |
+| `/context` | POST | 360-degree symbol view |
+| `/impact` | POST | Blast radius analysis |
+| `/detect_changes` | POST | Git-diff impact |
+| `/rename` | POST | Multi-file coordinated rename |
+| `/cypher` | POST | Raw Cypher queries |
+| `/list_repos` | GET | List indexed repositories |
+| `/shutdown` | POST | Gracefully stop the server |
+
+### Example request
+
+```bash
+curl -X POST http://localhost:4848/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "authentication",
+    "limit": 3
+  }'
+```
+
+### Example response
+
+```json
+{
+  "processes": [{
+    "summary": "LoginFlow",
+    "priority": 0.042,
+    "symbol_count": 4
+  }],
+  "process_symbols": [...],
+  "definitions": [...]
+}
+```
+
+## Performance comparison
+
+| Method | Cold Start | Warm Call | Use Case |
+|--------|-----------|-----------|----------|
+| MCP stdio | ~200ms | ~200ms | Development (editor integration) |
+| eval-server | ~50ms | ~5ms | Benchmarks (persistent connection) |
+| Direct CLI | ~150ms | ~150ms | Scripting (one-off queries) |
+
+## Differences from MCP server
+
+| Feature | MCP Server | Eval Server |
+|---------|-----------|-------------|
+| Protocol | stdio | HTTP |
+| Connection | Per-request | Persistent |
+| Editor support | ✓ | ✗ |
+| Benchmark usage | ✗ | ✓ |
+| Auto-shutdown | ✗ | ✓ (optional) |
+
+## Security
+
+<Warning>
+The eval server binds to `127.0.0.1` (localhost only) by default. Do not expose it to public networks.
+</Warning>
+
+No authentication is required — the server is designed for local evaluation environments, not production deployment.
+
+## Troubleshooting
+
+### Port already in use
+
+```bash
+# Check what's using the port
+lsof -i :4848
+
+# Use a different port
+gitnexus eval-server --port 5000
+```
+
+### Server not responding
+
+```bash
+# Check if server is running
+curl http://localhost:4848/list_repos
+
+# Check logs (stdout/stderr)
+gitnexus eval-server 2>&1 | tee server.log
+```
+
+### Memory leaks in long-running tests
+
+```bash
+# Use idle timeout to periodically restart
+gitnexus eval-server --idle-timeout 300
+```
+
+## Related commands
+
+- [gitnexus mcp](/api/commands/mcp) — Standard MCP server for editors
+- [gitnexus serve](/api/commands/serve) — HTTP server for web UI
+- [gitnexus query](/api/commands/query) — Direct CLI query

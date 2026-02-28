@@ -136,7 +136,9 @@
               "api/commands/query",
               "api/commands/context",
               "api/commands/impact",
-              "api/commands/cypher"
+              "api/commands/cypher",
+              "api/commands/augment",
+              "api/commands/eval-server"
             ]
           }
         ]

@@ -1,0 +1,93 @@
+---
+title: gitnexus augment
+description: Augment search patterns with knowledge graph context (used by hooks)
+---
+
+## Overview
+
+The `augment` command enriches a search pattern with relevant context from the knowledge graph. This is primarily used internally by Claude Code PreToolUse hooks to automatically enhance `grep`, `glob`, and `bash` commands with architectural awareness.
+
+<Note>
+This command is typically called automatically by hooks, not manually. It's exposed as a CLI command for debugging and testing hook behavior.
+</Note>
+
+## Syntax
+
+```bash
+gitnexus augment <pattern>
+```
+
+## Parameters
+
+<ParamField path="pattern" type="string" required>
+  The search pattern to augment with knowledge graph context.
+  
+  Can be a file path pattern, symbol name, or search query.
+</ParamField>
+
+## How it works
+
+When you run a search command in Claude Code, the PreToolUse hook:
+
+1. Intercepts the command before execution
+2. Calls `gitnexus augment` with the search pattern
+3. Receives relevant architectural context from the knowledge graph
+4. Injects this context into the agent's prompt
+5. The agent sees both the raw search results AND the structural context
+
+## Example
+
+```bash
+gitnexus augment "validateUser"
+```
+
+Returns context like:
+- Functions/classes with that name
+- What calls them (upstream dependencies)
+- What they call (downstream dependencies)
+- Which functional clusters they belong to
+- Which execution flows they participate in
+
+## Use cases
+
+### Debugging hook behavior
+
+If Claude Code hooks aren't providing expected context:
+
+```bash
+gitnexus augment "auth"
+```
+
+Shows exactly what context the hook would inject for an "auth" search.
+
+### Testing graph queries
+
+Preview what architectural context is available for a pattern:
+
+```bash
+gitnexus augment "src/api/users.ts"
+```
+
+Shows all symbols, relationships, and processes related to that file.
+
+## Hook integration
+
+This command is automatically invoked when Claude Code hooks are configured via `gitnexus setup`. The hook configuration in `.claude/hooks/gitnexus.json` specifies:
+
+```json
+{
+  "matcher": "Grep|Glob|Bash",
+  "mode": "PreToolUse"
+}
+```
+
+When the agent calls `grep`, `glob`, or `bash`, the hook:
+1. Extracts the search pattern
+2. Runs `gitnexus augment <pattern>`
+3. Adds results to the agent's context
+
+## Related commands
+
+- [gitnexus setup](/api/commands/setup) — Configure hooks
+- [gitnexus query](/api/commands/query) — Direct search (not hook-based)
+- [gitnexus context](/api/commands/context) — Get symbol context
