@@ -1,0 +1,171 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "GitNexus",
+  "projectDescription": "Graph-powered code intelligence engine that indexes codebases into knowledge graphs for AI agents",
+  "theme": "aspen",
+  "primaryColor": "#6366f1",
+  "lightColor": "#818cf8",
+  "darkColor": "#4f46e5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/knowledge-graph",
+              "concepts/indexing-pipeline",
+              "concepts/hybrid-search",
+              "concepts/processes-and-flows"
+            ]
+          },
+          {
+            "group": "CLI Usage",
+            "pages": [
+              "cli/overview",
+              "cli/analyze",
+              "cli/setup",
+              "cli/serve",
+              "cli/clean",
+              "cli/wiki"
+            ]
+          },
+          {
+            "group": "MCP Integration",
+            "pages": [
+              "mcp/overview",
+              "mcp/editor-setup",
+              "mcp/claude-code",
+              "mcp/cursor",
+              "mcp/multi-repo"
+            ]
+          },
+          {
+            "group": "Agent Skills",
+            "pages": [
+              "skills/overview",
+              "skills/exploring",
+              "skills/debugging",
+              "skills/impact-analysis",
+              "skills/refactoring"
+            ]
+          },
+          {
+            "group": "Web UI",
+            "pages": [
+              "web/overview",
+              "web/getting-started",
+              "web/local-backend"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/supported-languages",
+              "advanced/architecture",
+              "advanced/privacy-security",
+              "advanced/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "MCP Tools",
+            "pages": [
+              "api/tools/list-repos",
+              "api/tools/query",
+              "api/tools/context",
+              "api/tools/impact",
+              "api/tools/detect-changes",
+              "api/tools/rename",
+              "api/tools/cypher"
+            ]
+          },
+          {
+            "group": "MCP Resources",
+            "pages": [
+              "api/resources/overview",
+              "api/resources/repos",
+              "api/resources/context",
+              "api/resources/clusters",
+              "api/resources/processes"
+            ]
+          },
+          {
+            "group": "MCP Prompts",
+            "pages": [
+              "api/prompts/detect-impact",
+              "api/prompts/generate-map"
+            ]
+          },
+          {
+            "group": "CLI Commands",
+            "pages": [
+              "api/commands/analyze",
+              "api/commands/setup",
+              "api/commands/mcp",
+              "api/commands/serve",
+              "api/commands/list",
+              "api/commands/status",
+              "api/commands/clean",
+              "api/commands/wiki",
+              "api/commands/query",
+              "api/commands/context",
+              "api/commands/impact",
+              "api/commands/cypher"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Knowledge graph construction from codebases",
+    "Multi-language AST parsing with Tree-sitter",
+    "MCP server for AI agent integration",
+    "Hybrid search (BM25 + semantic + RRF)",
+    "Impact analysis and blast radius detection",
+    "Process tracing and execution flow mapping",
+    "Multi-repo support with global registry",
+    "Client-side web UI with WASM",
+    "Agent skills for code exploration and refactoring",
+    "Wiki generation from knowledge graphs",
+    "Multi-file coordinated renaming",
+    "Git-diff change impact detection"
+  ],
+  "publicApiSurface": [
+    "gitnexus analyze",
+    "gitnexus setup",
+    "gitnexus mcp",
+    "gitnexus serve",
+    "gitnexus list",
+    "gitnexus status",
+    "gitnexus clean",
+    "gitnexus wiki",
+    "gitnexus query",
+    "gitnexus context",
+    "gitnexus impact",
+    "gitnexus cypher",
+    "list_repos (MCP tool)",
+    "query (MCP tool)",
+    "context (MCP tool)",
+    "impact (MCP tool)",
+    "detect_changes (MCP tool)",
+    "rename (MCP tool)",
+    "cypher (MCP tool)",
+    "detect_impact (MCP prompt)",
+    "generate_map (MCP prompt)"
+  ]
+}
