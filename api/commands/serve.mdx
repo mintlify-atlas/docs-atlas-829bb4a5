@@ -1,0 +1,128 @@
+---
+title: gitnexus serve
+description: Start local HTTP server for web UI connection
+---
+
+## Syntax
+
+```bash
+gitnexus serve
+```
+
+## Description
+
+Starts a local HTTP server that serves the GitNexus API for all indexed repositories. This enables the [GitNexus web UI](https://gitnexus.vercel.app) to connect to your local indexes without re-uploading or re-indexing.
+
+The server:
+
+- Serves all indexed repositories from the global registry
+- Exposes a REST API for all GitNexus tools
+- Enables the web UI to access your local knowledge graphs
+- Supports AI chat with full tool access
+
+## Options
+
+<ParamField path="--port" type="string" optional>
+  Port number to listen on.
+  
+  **Default**: `4747`
+</ParamField>
+
+<ParamField path="--host" type="string" optional>
+  Bind address.
+  
+  **Default**: `127.0.0.1` (localhost only)
+  
+  Use `0.0.0.0` to allow remote access from other devices on your network.
+</ParamField>
+
+## Usage Examples
+
+### Start server on default port
+
+```bash
+gitnexus serve
+```
+
+### Use custom port
+
+```bash
+gitnexus serve --port 8080
+```
+
+### Allow remote access
+
+```bash
+gitnexus serve --host 0.0.0.0
+```
+
+### Custom port and remote access
+
+```bash
+gitnexus serve --port 8080 --host 0.0.0.0
+```
+
+## Output Example
+
+```
+GitNexus HTTP server listening on http://127.0.0.1:4747
+Serving 2 repositories: my-app, backend-api
+
+Open the web UI and connect to this server:
+https://gitnexus.vercel.app
+```
+
+## Web UI Integration
+
+Once the server is running:
+
+1. Open [https://gitnexus.vercel.app](https://gitnexus.vercel.app) in your browser
+2. The web UI auto-detects the local server
+3. All your indexed repositories appear in the UI
+4. AI chat has full access to GitNexus tools (Cypher, search, code navigation)
+
+**100% client-side** — Your code never leaves the browser. The web UI routes tool calls through your local HTTP API.
+
+## API Endpoints
+
+The server exposes these endpoints:
+
+- `GET /repos` — List all indexed repositories
+- `POST /tools/query` — Hybrid search
+- `POST /tools/context` — Symbol context
+- `POST /tools/impact` — Blast radius analysis
+- `POST /tools/detect_changes` — Git diff impact
+- `POST /tools/rename` — Multi-file rename
+- `POST /tools/cypher` — Raw Cypher queries
+
+See the [HTTP API Reference](/api/http) for detailed documentation.
+
+## Remote Access
+
+By default, the server only accepts connections from `127.0.0.1` (localhost). This prevents other devices on your network from accessing your code.
+
+If you want to access the web UI from another device (e.g., tablet, phone), use `--host 0.0.0.0`:
+
+```bash
+gitnexus serve --host 0.0.0.0
+```
+
+Then open the web UI on the other device and connect to `http://<your-ip>:4747`.
+
+**Security Note**: This exposes your code intelligence to your local network. Only use this on trusted networks.
+
+## When to Use
+
+Use the HTTP server when:
+
+- You want to browse your knowledge graph in a web UI
+- You want to use AI chat with full GitNexus tool access
+- You want to share your knowledge graph with teammates on the same network
+- You want to access GitNexus from a device that doesn't have Node.js installed
+
+For AI editor integration, use [`gitnexus mcp`](/api/commands/mcp) instead (configured automatically by [`gitnexus setup`](/api/commands/setup)).
+
+## Related Commands
+
+- [`gitnexus mcp`](/api/commands/mcp) — Start MCP server for AI editors
+- [`gitnexus list`](/api/commands/list) — List all indexed repositories

@@ -1,0 +1,395 @@
+---
+title: cypher
+description: Execute Cypher queries against the code knowledge graph
+---
+
+## Overview
+
+The `cypher` tool allows you to execute custom Cypher queries against the code knowledge graph for complex structural queries that other tools can't answer. This is a power-user tool that requires understanding the graph schema.
+
+<Info>
+  **When to use**: Complex structural queries that search/explore can't answer. READ `gitnexus://repo/{name}/schema` first for the full schema.
+  
+  **Next step**: Use `context()` on result symbols for deeper context.
+</Info>
+
+## Parameters
+
+<ParamField path="query" type="string" required>
+  Cypher query to execute
+  
+  Must be valid Cypher syntax compatible with KuzuDB.
+</ParamField>
+
+<ParamField path="repo" type="string">
+  Repository name or path. Required when multiple repos are indexed. Omit if only one repo is available.
+</ParamField>
+
+## Response
+
+<ResponseField name="markdown" type="string" required>
+  Query results formatted as a Markdown table for easy reading
+</ResponseField>
+
+<ResponseField name="row_count" type="number" required>
+  Number of rows returned by the query
+</ResponseField>
+
+## Graph Schema
+
+### Node Types
+
+- **File** - Source files
+- **Folder** - Directories
+- **Function** - Functions
+- **Class** - Classes
+- **Interface** - Interfaces
+- **Method** - Class methods
+- **CodeElement** - Generic code elements
+- **Community** - Functional areas (auto-detected)
+- **Process** - Execution flows
+
+### Multi-Language Nodes
+
+Use backticks for language-specific types:
+- `` `Struct` `` - Rust, C, Go structs
+- `` `Enum` `` - Enumerations
+- `` `Trait` `` - Rust traits
+- `` `Impl` `` - Rust implementations
+
+### Relationships
+
+All edges use a single **CodeRelation** table with a `type` property:
+
+<ParamField path="type" type="string">
+  Relationship type:
+  - `CONTAINS` - Folder contains file, file contains function
+  - `DEFINES` - File defines a symbol
+  - `CALLS` - Function calls another function
+  - `IMPORTS` - File imports from another file
+  - `EXTENDS` - Class extends another class
+  - `IMPLEMENTS` - Class implements an interface
+  - `MEMBER_OF` - Symbol belongs to a community
+  - `STEP_IN_PROCESS` - Symbol is a step in an execution flow
+</ParamField>
+
+### Edge Properties
+
+<ResponseField name="type" type="string" required>
+  Relationship type (see above)
+</ResponseField>
+
+<ResponseField name="confidence" type="number">
+  Confidence score (0-1) for fuzzy relationships
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  Human-readable explanation for the relationship
+</ResponseField>
+
+<ResponseField name="step" type="number">
+  Step number for STEP_IN_PROCESS relationships
+</ResponseField>
+
+## Example Queries
+
+### Find Callers of a Function
+
+```cypher
+MATCH (a)-[:CodeRelation {type: 'CALLS'}]->(b:Function {name: "validateUser"})
+RETURN a.name, a.filePath
+```
+
+### Find Community Members
+
+```cypher
+MATCH (f)-[:CodeRelation {type: 'MEMBER_OF'}]->(c:Community)
+WHERE c.heuristicLabel = "Auth"
+RETURN f.name, f.type, f.filePath
+```
+
+### Trace a Process
+
+```cypher
+MATCH (s)-[r:CodeRelation {type: 'STEP_IN_PROCESS'}]->(p:Process)
+WHERE p.heuristicLabel = "UserLogin"
+RETURN s.name, s.type, r.step
+ORDER BY r.step
+```
+
+### Find All Functions in a File
+
+```cypher
+MATCH (file:File {path: "src/auth/validator.ts"})-[:CodeRelation {type: 'DEFINES'}]->(f:Function)
+RETURN f.name, f.line
+ORDER BY f.line
+```
+
+### Find Unused Functions
+
+```cypher
+MATCH (f:Function)
+WHERE NOT (()-[:CodeRelation {type: 'CALLS'}]->(f))
+RETURN f.name, f.filePath
+```
+
+### Find Call Chains (2 Hops)
+
+```cypher
+MATCH path = (a:Function)-[:CodeRelation {type: 'CALLS'}*1..2]->(b:Function {name: "processPayment"})
+RETURN [n IN nodes(path) | n.name] AS chain
+LIMIT 10
+```
+
+### Find Classes Implementing an Interface
+
+```cypher
+MATCH (c:Class)-[:CodeRelation {type: 'IMPLEMENTS'}]->(i:Interface {name: "Repository"})
+RETURN c.name, c.filePath
+```
+
+### Find Hot Paths (Most Called Functions)
+
+```cypher
+MATCH (caller)-[:CodeRelation {type: 'CALLS'}]->(f:Function)
+RETURN f.name, f.filePath, count(caller) AS callCount
+ORDER BY callCount DESC
+LIMIT 10
+```
+
+### Find Cross-Module Dependencies
+
+```cypher
+MATCH (a)-[r:CodeRelation {type: 'CALLS'}]->(b)
+WHERE a.module <> b.module
+RETURN a.module AS from_module, b.module AS to_module, count(r) AS dependencies
+ORDER BY dependencies DESC
+```
+
+### Find Files with No Tests
+
+```cypher
+MATCH (f:File)
+WHERE NOT f.filePath CONTAINS "test" 
+  AND NOT f.filePath CONTAINS "spec"
+  AND NOT (()-[:CodeRelation {type: 'IMPORTS'}]->(f))
+RETURN f.path
+```
+
+## Example Usage
+
+### Basic Query
+
+```javascript
+cypher({
+  query: `
+    MATCH (a)-[:CodeRelation {type: 'CALLS'}]->(b:Function {name: "validateUser"})
+    RETURN a.name, a.filePath
+  `
+})
+```
+
+### Process Trace Query
+
+```javascript
+cypher({
+  query: `
+    MATCH (s)-[r:CodeRelation {type: 'STEP_IN_PROCESS'}]->(p:Process)
+    WHERE p.heuristicLabel = "LoginFlow"
+    RETURN s.name, r.step, s.filePath
+    ORDER BY r.step
+  `
+})
+```
+
+### Multi-Repo Query
+
+```javascript
+cypher({
+  query: `
+    MATCH (f:Function)
+    WHERE NOT (()-[:CodeRelation {type: 'CALLS'}]->(f))
+    RETURN f.name, f.filePath
+    LIMIT 20
+  `,
+  repo: "my-app"
+})
+```
+
+## Example Response
+
+```json
+{
+  "markdown": "| a.name | a.filePath |\n|--------|------------|\n| loginHandler | src/auth/login.ts |\n| apiMiddleware | src/api/middleware.ts |\n| testHelper | src/tests/helpers.ts |",
+  "row_count": 3
+}
+```
+
+**Rendered:**
+
+| a.name | a.filePath |
+|--------|------------|
+| loginHandler | src/auth/login.ts |
+| apiMiddleware | src/api/middleware.ts |
+| testHelper | src/tests/helpers.ts |
+
+## Important Notes
+
+<Warning>
+  **Single Relationship Table**
+  
+  All relationships use a single `CodeRelation` table with a `type` property. Always filter relationships using `{type: 'CALLS'}` syntax, not separate relationship types.
+  
+  **Correct:**
+  ```cypher
+  MATCH (a)-[:CodeRelation {type: 'CALLS'}]->(b)
+  ```
+  
+  **Incorrect:**
+  ```cypher
+  MATCH (a)-[:CALLS]->(b)
+  ```
+</Warning>
+
+<Note>
+  **Community vs Process**
+  
+  - **Community**: Auto-detected functional area (Leiden algorithm) — groups related code
+  - **Process**: Execution flow trace from entry point to terminal — shows how code runs
+  
+  Use `heuristicLabel` (not `label`) for human-readable community/process names.
+</Note>
+
+## Real-World Examples
+
+### Example 1: Finding Circular Dependencies
+
+```javascript
+cypher({
+  query: `
+    MATCH path = (a:Function)-[:CodeRelation {type: 'CALLS'}*2]->(a)
+    RETURN [n IN nodes(path) | n.name] AS cycle
+    LIMIT 5
+  `
+})
+
+// Result: Circular call chains that may indicate design issues
+```
+
+### Example 2: Architecture Analysis
+
+```javascript
+cypher({
+  query: `
+    MATCH (c:Community)
+    OPTIONAL MATCH (c)<-[:CodeRelation {type: 'MEMBER_OF'}]-(member)
+    RETURN c.heuristicLabel AS community, count(member) AS members
+    ORDER BY members DESC
+  `
+})
+
+// Result: Functional areas ranked by size
+```
+
+### Example 3: Debugging Entry Points
+
+```javascript
+cypher({
+  query: `
+    MATCH (f:Function)
+    WHERE NOT (()-[:CodeRelation {type: 'CALLS'}]->(f))
+      AND (f)-[:CodeRelation {type: 'CALLS'}]->()
+    RETURN f.name, f.filePath
+  `
+})
+
+// Result: Functions that are called by no one but call others (entry points)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Read the schema first">
+    Always `READ gitnexus://repo/{name}/schema` before writing Cypher queries to understand available node types and relationships.
+  </Accordion>
+  
+  <Accordion title="Use relationship filters">
+    Always filter CodeRelation edges by type: `[:CodeRelation {type: 'CALLS'}]`. The graph has many relationship types.
+  </Accordion>
+  
+  <Accordion title="Limit result size">
+    Add `LIMIT` clauses to large queries to avoid overwhelming responses. Start with `LIMIT 10` or `LIMIT 20`.
+  </Accordion>
+  
+  <Accordion title="Order results">
+    Use `ORDER BY` to make results more readable. Common orderings: `line` number, `name`, count aggregations.
+  </Accordion>
+  
+  <Accordion title="Use heuristicLabel for communities">
+    When querying Community or Process nodes, use `heuristicLabel` (not `label`) for human-readable names.
+  </Accordion>
+  
+  <Accordion title="Follow up with context()">
+    After finding symbols with Cypher, use `context()` to get full relationship details and process participation.
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Pattern: Find Dependencies
+
+```cypher
+MATCH (a {name: "targetFunction"})-[:CodeRelation {type: 'CALLS'}]->(b)
+RETURN b.name, b.filePath
+```
+
+### Pattern: Find Dependents
+
+```cypher
+MATCH (a)-[:CodeRelation {type: 'CALLS'}]->(b {name: "targetFunction"})
+RETURN a.name, a.filePath
+```
+
+### Pattern: Count Relationships
+
+```cypher
+MATCH (a)-[r:CodeRelation {type: 'CALLS'}]->(b)
+RETURN count(r) AS totalCalls
+```
+
+### Pattern: Path Traversal
+
+```cypher
+MATCH path = (start)-[:CodeRelation*1..3]->(end)
+WHERE start.name = "entryPoint" AND end.name = "target"
+RETURN [n IN nodes(path) | n.name] AS chain
+```
+
+## Use Cases
+
+- **Custom impact analysis**: Beyond what `impact()` provides
+- **Architecture queries**: "Show me all cross-module dependencies"
+- **Code smell detection**: Find circular dependencies, unused code
+- **Process analysis**: Trace specific execution flows
+- **Dependency mapping**: Build custom dependency graphs
+- **Metrics**: Count relationships, measure complexity
+
+## Limitations
+
+<Warning>
+  **Performance Considerations**
+  
+  Complex path queries (`*1..5`) on large codebases can be slow. Start with small hop counts and add `LIMIT` clauses.
+</Warning>
+
+## Related Tools
+
+- [query](/api/tools/query) - Simpler semantic search for most use cases
+- [context](/api/tools/context) - Follow up on Cypher results for full context
+- [impact](/api/tools/impact) - Pre-built blast radius analysis
+
+## Related Resources
+
+- `gitnexus://repo/{name}/schema` - **READ THIS FIRST** - Full graph schema
+- `gitnexus://repo/{name}/clusters` - Browse communities for query targets
+- `gitnexus://repo/{name}/processes` - Browse processes for query targets

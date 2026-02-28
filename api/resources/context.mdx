@@ -1,0 +1,181 @@
+---
+title: gitnexus://repo/{name}/context
+description: Codebase overview with stats, staleness check, and available tools
+---
+
+## Resource URI
+
+```
+gitnexus://repo/{name}/context
+```
+
+<ParamField path="name" type="string" required>
+  Repository name from `gitnexus://repos`
+</ParamField>
+
+## Description
+
+Returns a comprehensive overview of a specific repository, including:
+- Project name and statistics
+- Index staleness detection (if repo has new commits)
+- Available tools and resources
+- Re-indexing instructions
+
+This is typically the **first resource you read** after discovering repos.
+
+## Returns
+
+<ResponseField name="project" type="string">
+  Repository name
+</ResponseField>
+
+<ResponseField name="staleness" type="string" optional>
+  Human-readable staleness hint (only present if index is stale)
+  
+  Example: `"Index is 3 commits behind HEAD. Run: npx gitnexus analyze"`
+</ResponseField>
+
+<ResponseField name="stats" type="object">
+  Codebase statistics
+  
+  <Expandable title="properties">
+    <ResponseField name="files" type="number">
+      Number of indexed files
+    </ResponseField>
+    
+    <ResponseField name="symbols" type="number">
+      Total code symbols (functions, classes, methods, etc.)
+    </ResponseField>
+    
+    <ResponseField name="processes" type="number">
+      Detected execution flows
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="tools_available" type="array">
+  List of MCP tools with descriptions
+  
+  - `query` — Process-grouped code intelligence
+  - `context` — 360-degree symbol view
+  - `impact` — Blast radius analysis
+  - `detect_changes` — Git-diff impact analysis
+  - `rename` — Multi-file coordinated rename
+  - `cypher` — Raw graph queries
+  - `list_repos` — Discover all indexed repositories
+</ResponseField>
+
+<ResponseField name="re_index" type="string">
+  Command to re-index if data is stale
+</ResponseField>
+
+<ResponseField name="resources_available" type="array">
+  List of available MCP resources for this repo
+</ResponseField>
+
+## When to Use
+
+- **After discovering repos**: Check overview and staleness
+- **Before starting work**: Verify index is up-to-date
+- **Understanding scope**: See how large the codebase is
+- **Feature discovery**: Learn what tools and resources are available
+
+## Example Response
+
+### Fresh Index
+
+```yaml
+project: my-app
+
+stats:
+  files: 342
+  symbols: 1248
+  processes: 87
+
+tools_available:
+  - query: Process-grouped code intelligence (execution flows related to a concept)
+  - context: 360-degree symbol view (categorized refs, process participation)
+  - impact: Blast radius analysis (what breaks if you change a symbol)
+  - detect_changes: Git-diff impact analysis (what do your changes affect)
+  - rename: Multi-file coordinated rename with confidence tags
+  - cypher: Raw graph queries
+  - list_repos: Discover all indexed repositories
+
+re_index: Run `npx gitnexus analyze` in terminal if data is stale
+
+resources_available:
+  - gitnexus://repos: All indexed repositories
+  - gitnexus://repo/my-app/clusters: All functional areas
+  - gitnexus://repo/my-app/processes: All execution flows
+  - gitnexus://repo/my-app/cluster/{name}: Module details
+  - gitnexus://repo/my-app/process/{name}: Process trace
+```
+
+### Stale Index
+
+```yaml
+project: my-app
+
+staleness: "Index is 3 commits behind HEAD. Run: npx gitnexus analyze"
+
+stats:
+  files: 342
+  symbols: 1248
+  processes: 87
+
+tools_available:
+  - query: Process-grouped code intelligence (execution flows related to a concept)
+  - context: 360-degree symbol view (categorized refs, process participation)
+  - impact: Blast radius analysis (what breaks if you change a symbol)
+  - detect_changes: Git-diff impact analysis (what do your changes affect)
+  - rename: Multi-file coordinated rename with confidence tags
+  - cypher: Raw graph queries
+  - list_repos: Discover all indexed repositories
+
+re_index: Run `npx gitnexus analyze` in terminal if data is stale
+
+resources_available:
+  - gitnexus://repos: All indexed repositories
+  - gitnexus://repo/my-app/clusters: All functional areas
+  - gitnexus://repo/my-app/processes: All execution flows
+  - gitnexus://repo/my-app/cluster/{name}: Module details
+  - gitnexus://repo/my-app/process/{name}: Process trace
+```
+
+## Staleness Detection
+
+GitNexus automatically detects if the index is behind the current git HEAD:
+- Compares indexed commit hash with current HEAD
+- Counts commits between indexed state and HEAD
+- Provides actionable re-indexing hint
+
+<Warning>
+  If `staleness` is present, re-index before performing analysis to ensure accurate results.
+</Warning>
+
+## Next Steps
+
+After reading this resource:
+
+<Steps>
+  <Step title="Check Staleness">
+    If staleness warning appears, run `npx gitnexus analyze` to update the index
+  </Step>
+  
+  <Step title="Explore Structure">
+    Read `gitnexus://repo/{name}/clusters` or `gitnexus://repo/{name}/processes` to understand the codebase
+  </Step>
+  
+  <Step title="Use Tools">
+    Start using tools like `query`, `context`, or `impact` for analysis
+  </Step>
+</Steps>
+
+<CardGroup cols={2}>
+  <Card title="Clusters Resource" icon="diagram-project" href="/api/resources/clusters">
+    Explore functional areas
+  </Card>
+  <Card title="Processes Resource" icon="route" href="/api/resources/processes">
+    View execution flows
+  </Card>
+</CardGroup>

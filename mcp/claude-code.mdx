@@ -1,0 +1,319 @@
+---
+title: Claude Code Setup
+description: Full GitNexus integration with MCP, skills, and PreToolUse hooks
+---
+
+Claude Code receives the **deepest integration** with GitNexus:
+
+- **MCP Tools** — All 7 code intelligence tools
+- **Agent Skills** — 6 skill files teaching effective tool usage
+- **PreToolUse Hooks** — Automatic knowledge graph enrichment for grep/glob/bash
+
+## Quick Setup
+
+Run the setup command to configure everything automatically:
+
+```bash
+npx gitnexus setup
+```
+
+This will:
+
+1. Detect Claude Code installation
+2. Print the MCP configuration command
+3. Install skills to `~/.claude/skills/gitnexus/`
+4. Install PreToolUse hooks to `~/.claude/hooks/gitnexus/`
+5. Update `~/.claude/settings.json` with hook configuration
+
+<Accordion title="Example output">
+```
+GitNexus Setup
+==============
+
+  Claude Code detected. Run this command to add GitNexus MCP:
+
+    claude mcp add gitnexus -- npx -y gitnexus mcp
+
+Configured:
+  + Claude Code (MCP manual step printed)
+  + Claude Code skills (6 skills → ~/.claude/skills/)
+  + Claude Code hooks (PreToolUse)
+```
+</Accordion>
+
+## Manual MCP Configuration
+
+If you prefer manual setup, run:
+
+```bash
+claude mcp add gitnexus -- npx -y gitnexus@latest mcp
+```
+
+This configures the MCP server connection. Claude Code will spawn `npx gitnexus mcp` automatically.
+
+## Agent Skills
+
+GitNexus ships with 6 agent skill files that teach Claude Code how to use the tools effectively:
+
+| Skill | Purpose | Location |
+|-------|---------|----------|
+| `gitnexus-exploring` | Navigate unfamiliar code using the knowledge graph | `~/.claude/skills/gitnexus-exploring/` |
+| `gitnexus-debugging` | Trace bugs through call chains | `~/.claude/skills/gitnexus-debugging/` |
+| `gitnexus-impact-analysis` | Analyze blast radius before changes | `~/.claude/skills/gitnexus-impact-analysis/` |
+| `gitnexus-refactoring` | Plan safe refactors using dependency mapping | `~/.claude/skills/gitnexus-refactoring/` |
+| `gitnexus-guide` | General guidance on tool usage | `~/.claude/skills/gitnexus-guide/` |
+| `gitnexus-cli` | CLI command reference | `~/.claude/skills/gitnexus-cli/` |
+
+Skills are installed automatically by:
+
+- `gitnexus setup` — Global skills for all projects
+- `gitnexus analyze` — Project-level skills in `.claude/skills/`
+
+<Info>
+**Skill Discovery:** Claude Code automatically discovers and loads skills from `~/.claude/skills/` (global) and `.claude/skills/` (project).
+</Info>
+
+## PreToolUse Hooks
+
+Claude Code's PreToolUse hook system allows GitNexus to **automatically enrich** tool calls before execution.
+
+### How Hooks Work
+
+When you use tools like `Grep`, `Glob`, or `Bash`, Claude Code:
+
+1. Intercepts the tool call before execution
+2. Runs the GitNexus hook script (`~/.claude/hooks/gitnexus/gitnexus-hook.cjs`)
+3. Enriches the call with knowledge graph context
+4. Passes the enriched context back to Claude Code
+5. Executes the original tool with additional context
+
+### Hook Configuration
+
+The `gitnexus setup` command adds this to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/you/.claude/hooks/gitnexus/gitnexus-hook.cjs\"",
+            "timeout": 8000,
+            "statusMessage": "Enriching with GitNexus graph context..."
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+<Warning>
+**SessionStart Hooks:** SessionStart hooks are currently broken on Windows (Claude Code bug #23576). GitNexus delivers session context via `CLAUDE.md` and skills instead.
+</Warning>
+
+### What Gets Enriched
+
+The hook enriches:
+
+- **Grep** — Adds process participation and caller/callee context
+- **Glob** — Adds functional cluster membership and related files
+- **Bash** — Adds execution flow context for commands like `git diff`
+
+This provides Claude Code with **automatic knowledge graph awareness** without requiring explicit tool calls.
+
+### Example Enrichment
+
+When you ask Claude Code to "find all authentication code":
+
+**Without hooks:**
+```bash
+# grep -r "auth" src/
+```
+
+**With hooks:**
+```bash
+# grep -r "auth" src/
+# [GitNexus Context Enrichment]
+# - Found 3 processes related to authentication:
+#   1. UserLoginFlow (12 steps, starts at src/auth/login.ts:45)
+#   2. TokenValidation (8 steps, starts at src/auth/validate.ts:23)
+#   3. OAuthCallback (15 steps, starts at src/auth/oauth.ts:67)
+# - Functional cluster: "Authentication" (cohesion: 87%)
+# - Related modules: Auth, Session, Security
+```
+
+Claude Code receives both the grep results AND the knowledge graph context.
+
+## Full Configuration File
+
+Complete `~/.claude/settings.json` example with GitNexus hooks:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/you/.claude/hooks/gitnexus/gitnexus-hook.cjs\"",
+            "timeout": 8000,
+            "statusMessage": "Enriching with GitNexus graph context..."
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+<Tip>
+You can add other PreToolUse hooks alongside GitNexus. The hooks array supports multiple entries.
+</Tip>
+
+## Verification
+
+Test your Claude Code integration:
+
+<Steps>
+  <Step title="Check MCP connection">
+    Ask Claude Code:
+    
+    > "List all indexed repositories"
+    
+    This should trigger the `list_repos` MCP tool.
+  </Step>
+  
+  <Step title="Test skills">
+    Ask Claude Code:
+    
+    > "How should I use GitNexus to understand this codebase?"
+    
+    Claude should reference the installed skills.
+  </Step>
+  
+  <Step title="Test hooks">
+    Ask Claude Code:
+    
+    > "Find all authentication code"
+    
+    Watch for the status message: "Enriching with GitNexus graph context..."
+  </Step>
+  
+  <Step title="Read resources">
+    Ask Claude Code:
+    
+    > "Read gitnexus://repos"
+    
+    This should show your indexed repositories.
+  </Step>
+</Steps>
+
+## Integration Levels
+
+Claude Code supports three integration levels:
+
+### Level 1: MCP Only
+
+MCP tools available, but no skills or hooks.
+
+**Setup:** `claude mcp add gitnexus -- npx -y gitnexus mcp`
+
+### Level 2: MCP + Skills
+
+MCP tools + agent skills for guided workflows.
+
+**Setup:** `gitnexus analyze` (installs project skills) or `gitnexus setup` (global skills)
+
+### Level 3: Full Integration (Recommended)
+
+MCP tools + skills + PreToolUse hooks for automatic enrichment.
+
+**Setup:** `gitnexus setup` (configures everything)
+
+<Info>
+**Recommendation:** Use Level 3 (full integration) for the best experience. Hooks provide automatic knowledge graph awareness without requiring explicit tool calls.
+</Info>
+
+## Project vs Global Configuration
+
+### Global Configuration
+
+Global configuration applies to **all projects** on your machine:
+
+- **MCP:** Configured via `claude mcp add` (stored in Claude Code's global settings)
+- **Skills:** `~/.claude/skills/gitnexus/`
+- **Hooks:** `~/.claude/settings.json` and `~/.claude/hooks/gitnexus/`
+
+### Project Configuration
+
+Project configuration applies to a **single repository**:
+
+- **Skills:** `.claude/skills/gitnexus/` (installed by `gitnexus analyze`)
+- **Hooks:** `.claude/settings.json` (advanced, rarely needed)
+- **Context:** `CLAUDE.md` and `AGENTS.md` (installed by `gitnexus analyze`)
+
+<Note>
+**Best Practice:** Use global MCP + hooks, project-level skills. This gives you consistent tool access while tailoring skill guidance to each codebase.
+</Note>
+
+## Updating GitNexus
+
+The MCP configuration uses `gitnexus@latest`, so you automatically get the latest version:
+
+```json
+"args": ["-y", "gitnexus@latest", "mcp"]
+```
+
+To force an update:
+
+```bash
+npm cache clean --force
+npx gitnexus@latest mcp
+```
+
+## Troubleshooting
+
+### Hooks not firing
+
+1. Check `~/.claude/settings.json` syntax (must be valid JSON)
+2. Verify hook script exists: `ls ~/.claude/hooks/gitnexus/gitnexus-hook.cjs`
+3. Check hook timeout (default: 8000ms)
+4. Restart Claude Code after configuration changes
+
+### Skills not loading
+
+1. Verify skills directory: `ls ~/.claude/skills/gitnexus-exploring/SKILL.md`
+2. Check skill format (must have `SKILL.md` filename)
+3. Restart Claude Code
+
+### MCP tools not appearing
+
+1. Verify MCP configuration: `claude mcp list`
+2. Check if server starts: `npx gitnexus mcp` (should not exit immediately)
+3. Check Claude Code MCP logs
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Using the Tools" icon="toolbox" href="/api/tools/query">
+    Learn how to use GitNexus tools effectively
+  </Card>
+  
+  <Card title="Multi-Repo Usage" icon="layer-group" href="/mcp/multi-repo">
+    Work with multiple indexed repositories
+  </Card>
+  
+  <Card title="Agent Skills" icon="graduation-cap" href="/skills/overview">
+    Understand the installed skill workflows
+  </Card>
+  
+  <Card title="Resources" icon="database" href="/api/resources/overview">
+    Explore MCP resources for structured data
+  </Card>
+</CardGroup>

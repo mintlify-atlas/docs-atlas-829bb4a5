@@ -1,0 +1,265 @@
+---
+title: Knowledge Graph Structure
+description: Understanding the graph database schema, node types, edges, and confidence scoring
+---
+
+GitNexus builds a complete knowledge graph of your codebase using [KuzuDB](https://kuzudb.com/), an embedded graph database. Every symbol, relationship, cluster, and execution flow is stored as nodes and edges with confidence scoring.
+
+## Graph Schema
+
+The knowledge graph consists of **nodes** representing code entities and **edges** representing relationships between them.
+
+### Node Types
+
+GitNexus creates several types of nodes during indexing:
+
+#### Code Structure Nodes
+
+<CardGroup cols={2}>
+  <Card title="File" icon="file-code">
+    Represents a source file in the repository
+  </Card>
+  <Card title="Folder" icon="folder">
+    Directory in the file tree
+  </Card>
+  <Card title="Module/Package" icon="box">
+    Language-specific module or package
+  </Card>
+</CardGroup>
+
+#### Symbol Nodes
+
+<CardGroup cols={2}>
+  <Card title="Function" icon="function">
+    Top-level function definitions
+  </Card>
+  <Card title="Class" icon="object-group">
+    Class definitions (OOP languages)
+  </Card>
+  <Card title="Method" icon="brackets-curly">
+    Methods within classes
+  </Card>
+  <Card title="Interface" icon="diagram-project">
+    TypeScript/Java interfaces, Go interfaces, etc.
+  </Card>
+  <Card title="Enum" icon="list-ol">
+    Enumeration types
+  </Card>
+  <Card title="Variable" icon="tag">
+    Module-level variables and constants
+  </Card>
+</CardGroup>
+
+#### Multi-Language Nodes
+
+Language-specific node types include:
+
+- **Struct** (C, C++, Go, Rust)
+- **Trait** (Rust)
+- **Impl** (Rust implementation blocks)
+- **Namespace** (C++, C#)
+- **Typedef/TypeAlias** (C, C++, TypeScript)
+- **Macro** (C, C++, Rust)
+- **Decorator/Annotation** (Python, TypeScript, Java)
+- **Constructor** (Java, C++, Swift)
+
+#### Analysis Nodes
+
+These are created during the clustering and process detection phases:
+
+<Card title="Community" icon="users">
+  Groups of symbols that work together frequently, detected via the Leiden algorithm. Represents functional areas of the codebase.
+
+  **Properties:**
+  - `heuristicLabel` - Auto-generated name based on folder patterns
+  - `cohesion` - Internal edge density score (0-1)
+  - `symbolCount` - Number of symbols in this community
+</Card>
+
+<Card title="Process" icon="diagram-next">
+  Execution flows traced from entry points through call chains. Represents how features execute through the codebase.
+
+  **Properties:**
+  - `processType` - `intra_community` or `cross_community`
+  - `stepCount` - Number of steps in the trace
+  - `communities` - Community IDs touched by this process
+  - `entryPointId` - Starting symbol
+  - `terminalId` - Final symbol in the chain
+</Card>
+
+## Edge Types
+
+Relationships between nodes are stored as **CodeRelation** edges with a `type` property:
+
+| Edge Type | Description | Example |
+|-----------|-------------|----------|
+| `CONTAINS` | File/folder containment | `Folder` → `File` |
+| `DEFINES` | File defines a symbol | `File` → `Function` |
+| `CALLS` | Function calls another function | `loginHandler` → `validateUser` |
+| `IMPORTS` | File imports from another file | `auth.ts` → `utils.ts` |
+| `EXTENDS` | Class inheritance | `AdminUser` → `BaseUser` |
+| `IMPLEMENTS` | Interface implementation | `UserService` → `IService` |
+| `MEMBER_OF` | Symbol belongs to a community | `validateUser` → `Authentication` community |
+| `STEP_IN_PROCESS` | Symbol is a step in an execution flow | `validateUser` → `LoginFlow` process (step 2) |
+
+<Note>
+All edges include `confidence` and `reason` properties for traceability. See [Confidence Scoring](#confidence-scoring) below.
+</Note>
+
+## Confidence Scoring
+
+GitNexus assigns a **confidence score** (0.0-1.0) to every relationship to indicate resolution certainty. This is critical for impact analysis and process tracing.
+
+### Confidence Levels
+
+<AccordionGroup>
+  <Accordion title="1.0 - Certain" icon="check">
+    **Same-file references** and **exact import-resolved calls**
+
+    ```typescript
+    // Same file - confidence: 1.0
+    function validateUser() { ... }
+    function login() {
+      validateUser(); // ← caller and callee in same file
+    }
+    ```
+
+    **Reason:** `same-file` or `import-resolved`
+  </Accordion>
+
+  <Accordion title="0.85 - High" icon="circle-check">
+    **Import-resolved across files with direct import statements**
+
+    ```typescript
+    // auth.ts
+    import { validateUser } from './validate';
+    validateUser(); // ← confidence: 0.85
+    ```
+
+    **Reason:** `import-resolved`
+  </Accordion>
+
+  <Accordion title="0.5 - Medium" icon="circle-half-stroke">
+    **Fuzzy name matching when imports can't be resolved**
+
+    Used as a fallback when Tree-sitter can't extract import details or the import path is ambiguous.
+
+    **Reason:** `fuzzy-global`
+  </Accordion>
+
+  <Accordion title="0.3 - Low" icon="circle-question">
+    **Very uncertain fuzzy matches**
+
+    Common symbol names that appear in many files (e.g., `render`, `init`, `process`).
+
+    **Reason:** `fuzzy-global-low-confidence`
+  </Accordion>
+</AccordionGroup>
+
+### Confidence Filtering
+
+Process detection filters out edges with confidence < 0.5 to avoid false traces:
+
+```typescript title="process-processor.ts:219"
+const MIN_TRACE_CONFIDENCE = 0.5;
+```
+
+Impact analysis tools accept a `minConfidence` parameter:
+
+```
+impact({target: "UserService", minConfidence: 0.8})
+```
+
+## Example Cypher Queries
+
+The MCP `cypher` tool and CLI allow direct graph queries. Here are common patterns:
+
+### Find All Callers of a Function
+
+```cypher
+MATCH (caller)-[r:CodeRelation {type: 'CALLS'}]->(fn:Function {name: 'validateUser'})
+WHERE r.confidence > 0.8
+RETURN caller.name, caller.filePath, r.confidence
+ORDER BY r.confidence DESC
+```
+
+### Find Functions in Authentication Community
+
+```cypher
+MATCH (c:Community {heuristicLabel: 'Authentication'})<-[:CodeRelation {type: 'MEMBER_OF'}]-(fn)
+WHERE fn.label IN ['Function', 'Method']
+RETURN fn.name, fn.filePath, fn.startLine
+```
+
+### Trace a Call Chain (3 Hops)
+
+```cypher
+MATCH path = (entry:Function {name: 'handleLogin'})
+  -[:CodeRelation {type: 'CALLS'}*1..3]->(terminal)
+WHERE ALL(r IN relationships(path) WHERE r.confidence > 0.5)
+RETURN [node IN nodes(path) | node.name] AS trace
+LIMIT 10
+```
+
+### Find Cross-Community Processes
+
+```cypher
+MATCH (p:Process {processType: 'cross_community'})
+RETURN p.name, p.stepCount, p.communities
+ORDER BY p.stepCount DESC
+```
+
+### Find High-Confidence Imports
+
+```cypher
+MATCH (source:File)-[r:CodeRelation {type: 'IMPORTS'}]->(target:File)
+WHERE r.confidence = 1.0
+RETURN source.filePath, target.filePath
+LIMIT 20
+```
+
+## Graph Statistics
+
+You can query graph statistics to understand codebase size:
+
+```cypher
+-- Count nodes by type
+MATCH (n)
+RETURN n.label AS nodeType, COUNT(n) AS count
+ORDER BY count DESC
+
+-- Count relationships by type
+MATCH ()-[r:CodeRelation]->()
+RETURN r.type AS relType, COUNT(r) AS count
+ORDER BY count DESC
+
+-- Find largest communities
+MATCH (c:Community)
+RETURN c.heuristicLabel, c.symbolCount, c.cohesion
+ORDER BY c.symbolCount DESC
+LIMIT 10
+```
+
+## Storage and Performance
+
+GitNexus uses **KuzuDB** for storage:
+
+- **CLI:** Native KuzuDB bindings (fast, persistent)
+- **Web UI:** KuzuDB WASM (in-memory, per-session)
+
+The graph is stored in `.gitnexus/` inside your repository (gitignored by default). A global registry at `~/.gitnexus/registry.json` tracks all indexed repos.
+
+<Info>
+**Multi-repo support:** The MCP server uses a connection pool to serve multiple indexed repos from a single server instance. Connections are opened lazily and evicted after 5 minutes of inactivity.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Indexing Pipeline" href="/concepts/indexing-pipeline" icon="gear">
+    Learn how the graph is built in 6 phases
+  </Card>
+  <Card title="Hybrid Search" href="/concepts/hybrid-search" icon="magnifying-glass">
+    Understand BM25 + semantic search with RRF
+  </Card>
+</CardGroup>

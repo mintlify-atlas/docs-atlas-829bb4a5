@@ -1,0 +1,159 @@
+---
+title: gitnexus clean
+description: Delete GitNexus index for current repository
+---
+
+## Syntax
+
+```bash
+gitnexus clean
+```
+
+## Description
+
+Removes the `.gitnexus/` index from the current repository and unregisters it from the global registry.
+
+By default, the command prompts for confirmation before deleting. Use `--force` to skip the prompt.
+
+## Options
+
+<ParamField path="--force" type="boolean" optional>
+  Skip confirmation prompt and delete immediately.
+</ParamField>
+
+<ParamField path="--all" type="boolean" optional>
+  Clean all indexed repositories instead of just the current one.
+  
+  Requires `--force` for confirmation.
+</ParamField>
+
+## Usage Examples
+
+### Clean current repository (with prompt)
+
+```bash
+gitnexus clean
+```
+
+Output:
+
+```
+This will delete the GitNexus index for: my-app
+   Path: /Users/dev/projects/my-app/.gitnexus
+
+Run with --force to confirm deletion.
+```
+
+### Clean current repository (skip prompt)
+
+```bash
+gitnexus clean --force
+```
+
+Output:
+
+```
+Deleted: /Users/dev/projects/my-app/.gitnexus
+```
+
+### Clean all repositories (with prompt)
+
+```bash
+gitnexus clean --all
+```
+
+Output:
+
+```
+This will delete GitNexus indexes for 2 repo(s):
+  - my-app (/Users/dev/projects/my-app/.gitnexus)
+  - backend-api (/Users/dev/projects/backend-api/.gitnexus)
+
+Run with --force to confirm deletion.
+```
+
+### Clean all repositories (skip prompt)
+
+```bash
+gitnexus clean --all --force
+```
+
+Output:
+
+```
+Deleted: my-app (/Users/dev/projects/my-app/.gitnexus)
+Deleted: backend-api (/Users/dev/projects/backend-api/.gitnexus)
+```
+
+## What Gets Deleted
+
+- `.gitnexus/` directory in the repository
+  - KuzuDB database files
+  - Full-text search indexes
+  - Embedding data
+  - Wiki output
+  - Metadata files
+- Entry in global registry (`~/.gitnexus/registry.json`)
+
+## What Doesn't Get Deleted
+
+- Source code (only the index is removed)
+- AI context files (`AGENTS.md`, `CLAUDE.md`) — these are kept
+- Global skills in `~/.claude/skills/` or `~/.cursor/skills/`
+- MCP configuration files
+
+## Safety
+
+The clean command is **safe** — it only deletes GitNexus's own data. Your source code and git history are never touched.
+
+The `.gitnexus/` directory is automatically gitignored by the analyze command, so indexes are never committed to version control.
+
+## When to Use
+
+### Free up disk space
+
+Indexes can be large for big repositories (100MB+ for large codebases). Clean unused indexes:
+
+```bash
+gitnexus clean --force
+```
+
+### Reset corrupted index
+
+If the index is corrupted or incomplete:
+
+```bash
+gitnexus clean --force
+gitnexus analyze
+```
+
+### Before archiving a repository
+
+```bash
+gitnexus clean --force
+tar -czf my-app.tar.gz my-app/
+```
+
+### Clean all old indexes
+
+Remove all indexes at once:
+
+```bash
+gitnexus clean --all --force
+```
+
+## After Cleaning
+
+To re-index a repository:
+
+```bash
+gitnexus analyze
+```
+
+The MCP server and HTTP server will automatically discover the new index (no restart needed).
+
+## Related Commands
+
+- [`gitnexus analyze`](/api/commands/analyze) — Rebuild the index
+- [`gitnexus status`](/api/commands/status) — Check index status
+- [`gitnexus list`](/api/commands/list) — List all indexed repositories

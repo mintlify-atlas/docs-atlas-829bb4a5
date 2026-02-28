@@ -1,0 +1,255 @@
+---
+title: gitnexus wiki
+description: Generate repository wiki from knowledge graph
+---
+
+## Syntax
+
+```bash
+gitnexus wiki [path]
+```
+
+## Description
+
+Generates LLM-powered repository documentation from the knowledge graph. The wiki is built by analyzing clusters (functional communities) and using an LLM to describe each module's purpose, architecture, and key components.
+
+The wiki includes:
+
+- **Architecture overview** — High-level structure and design patterns
+- **Module documentation** — Each functional cluster gets a dedicated page
+- **Component diagrams** — Auto-generated from the knowledge graph
+- **Interactive viewer** — Single-file HTML with search and navigation
+
+## Options
+
+<ParamField path="path" type="string" optional>
+  Path to the repository. Defaults to current directory's git root.
+</ParamField>
+
+<ParamField path="--force" type="boolean" optional>
+  Force full regeneration even if the wiki is up to date with the current index.
+</ParamField>
+
+<ParamField path="--model" type="string" optional>
+  LLM model name.
+  
+  **Default**: `minimax/minimax-m2.5` (via OpenRouter)
+  
+  Examples:
+  - `gpt-4o-mini` (OpenAI)
+  - `claude-3-5-sonnet-20241022` (OpenRouter)
+  - `llama-3.1-70b-instruct` (custom endpoint)
+</ParamField>
+
+<ParamField path="--base-url" type="string" optional>
+  LLM API base URL.
+  
+  **Default**: `https://openrouter.ai/api/v1`
+  
+  Examples:
+  - `https://api.openai.com/v1` (OpenAI)
+  - `http://localhost:11434/v1` (Ollama)
+</ParamField>
+
+<ParamField path="--api-key" type="string" optional>
+  LLM API key. Saved to `~/.gitnexus/config.json` for future use.
+  
+  Can also be set via environment variables:
+  - `GITNEXUS_API_KEY`
+  - `OPENAI_API_KEY`
+</ParamField>
+
+<ParamField path="--concurrency" type="string" optional>
+  Number of parallel LLM calls.
+  
+  **Default**: `3`
+</ParamField>
+
+<ParamField path="--gist" type="boolean" optional>
+  Publish wiki as a public GitHub Gist after generation.
+  
+  Requires [GitHub CLI](https://cli.github.com) (`gh`) installed and authenticated.
+</ParamField>
+
+## Usage Examples
+
+### Generate wiki (interactive setup)
+
+```bash
+gitnexus wiki
+```
+
+First-time usage prompts for LLM configuration:
+
+```
+GitNexus Wiki Generator
+
+No LLM configured. Let's set it up.
+
+Supports OpenAI, OpenRouter, or any OpenAI-compatible API.
+
+[1] OpenAI (api.openai.com)
+[2] OpenRouter (openrouter.ai)
+[3] Custom endpoint
+
+Select provider (1/2/3):
+```
+
+### Use OpenAI
+
+```bash
+gitnexus wiki --model gpt-4o-mini --base-url https://api.openai.com/v1 --api-key sk-...
+```
+
+### Use custom model
+
+```bash
+gitnexus wiki --model llama-3.1-70b-instruct --base-url http://localhost:11434/v1
+```
+
+### Force regeneration
+
+```bash
+gitnexus wiki --force
+```
+
+### Publish to GitHub Gist
+
+```bash
+gitnexus wiki --gist
+```
+
+### High concurrency for faster generation
+
+```bash
+gitnexus wiki --concurrency 10
+```
+
+## Output Example
+
+```
+GitNexus Wiki Generator
+
+████████████████████████████████████████ 100% | Done
+
+Wiki generated successfully (45.3s)
+
+Mode: full
+Pages: 18
+Output: /Users/dev/projects/my-app/.gitnexus/wiki
+Viewer: /Users/dev/projects/my-app/.gitnexus/wiki/index.html
+
+Publish wiki as a GitHub Gist for easy viewing? (Y/n):
+```
+
+## Interactive Setup
+
+If no LLM configuration is found and you're in an interactive terminal, the command walks you through setup:
+
+1. **Provider selection** — OpenAI, OpenRouter, or custom endpoint
+2. **Model selection** — With smart defaults per provider
+3. **API key** — Optionally reuses existing env vars
+4. **Save to config** — Stored in `~/.gitnexus/config.json`
+
+After setup, future runs skip the prompts.
+
+## GitHub Gist Publishing
+
+The `--gist` flag (or interactive prompt) publishes the wiki as a public GitHub Gist:
+
+```bash
+gitnexus wiki --gist
+```
+
+Requirements:
+- [GitHub CLI](https://cli.github.com) installed
+- Authenticated with `gh auth login`
+
+Output:
+
+```
+Publishing to GitHub Gist...
+Gist:   https://gist.github.com/username/abc123
+Viewer: https://gistcdn.githack.com/username/abc123/raw/index.html
+```
+
+The viewer URL uses [githack.com](https://raw.githack.com) to serve the HTML with proper content-type headers.
+
+## Wiki Structure
+
+Generated wiki:
+
+```
+.gitnexus/wiki/
+├── index.html          # Interactive viewer (single file)
+├── architecture.md     # High-level overview
+├── module-auth.md      # Auth module docs
+├── module-api.md       # API module docs
+└── ...
+```
+
+The viewer (`index.html`) is a self-contained single-file app with:
+
+- Sidebar navigation
+- Full-text search
+- Markdown rendering
+- Syntax highlighting
+
+## When Wiki is Up-to-Date
+
+The wiki generator tracks the last indexed commit. If the index hasn't changed since the last wiki generation, it skips regeneration:
+
+```
+Wiki is already up to date.
+Viewer: /Users/dev/projects/my-app/.gitnexus/wiki/index.html
+```
+
+Use `--force` to regenerate anyway.
+
+## Failed Modules
+
+If some modules fail to generate (e.g., LLM errors, rate limits), the command reports them:
+
+```
+Failed modules (3):
+  - module-auth
+  - module-api
+  - module-db
+
+Re-run to retry failed modules (pages will be regenerated).
+```
+
+Failed modules are automatically retried on the next run.
+
+## LLM Cost Estimate
+
+For a typical repository with 20-30 modules:
+
+- **OpenAI (gpt-4o-mini)**: ~$0.50-$1.00
+- **OpenRouter (minimax/minimax-m2.5)**: ~$0.10-$0.30
+- **Ollama (local)**: Free
+
+## Performance
+
+Generation time depends on:
+
+- Number of modules (clusters)
+- LLM speed
+- Concurrency setting
+
+Typical times:
+
+- Small repo (5-10 modules): 10-20 seconds
+- Medium repo (20-30 modules): 30-60 seconds
+- Large repo (50+ modules): 2-5 minutes
+
+Increase concurrency for faster generation:
+
+```bash
+gitnexus wiki --concurrency 10
+```
+
+## Related Commands
+
+- [`gitnexus analyze`](/api/commands/analyze) — Index repository first
+- [`gitnexus status`](/api/commands/status) — Check index status

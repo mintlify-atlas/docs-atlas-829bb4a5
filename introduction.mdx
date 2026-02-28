@@ -1,0 +1,124 @@
+---
+title: Introduction
+description: Graph-powered code intelligence for AI agents. Give your AI deep architectural awareness of any codebase.
+---
+
+## Building nervous system for agent context
+
+GitNexus indexes any codebase into a knowledge graph — every dependency, call chain, cluster, and execution flow — then exposes it through smart tools so AI agents never miss code.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://github.com/user-attachments/assets/172685ba-8e54-4ea7-9ad1-e31a3398da72"
+  title="GitNexus Demo"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
+
+## The problem
+
+Tools like **Cursor**, **Claude Code**, **Cline**, **Roo Code**, and **Windsurf** are powerful — but they don't truly know your codebase structure.
+
+**What happens:**
+
+1. AI edits `UserService.validate()`
+2. Doesn't know 47 functions depend on its return type
+3. **Breaking changes ship**
+
+GitNexus solves this by precomputing relational intelligence at index time — clustering, tracing, scoring — so tools return complete context in one call.
+
+## Two ways to use GitNexus
+
+<CardGroup cols={2}>
+  <Card title="CLI + MCP" icon="terminal" href="/quickstart">
+    Index repos locally, connect AI agents via MCP. For daily development with Cursor, Claude Code, Windsurf, OpenCode.
+  </Card>
+  <Card title="Web UI" icon="globe" href="https://gitnexus.vercel.app">
+    Visual graph explorer + AI chat in browser. No install required — drag & drop and start exploring.
+  </Card>
+</CardGroup>
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Multi-repo MCP server" icon="server">
+    One MCP server serves all indexed repos. Set it up once, works everywhere.
+  </Card>
+  <Card title="Process-grouped search" icon="magnifying-glass">
+    Hybrid search (BM25 + semantic) returns results grouped by execution flows, not just file matches.
+  </Card>
+  <Card title="Impact analysis" icon="burst">
+    Blast radius analysis shows what breaks at depth 1/2/3 with confidence scores.
+  </Card>
+  <Card title="360-degree context" icon="diagram-project">
+    See all callers, callees, imports, and process participation for any symbol in one view.
+  </Card>
+  <Card title="Git-diff impact" icon="code-compare">
+    Maps changed lines to affected processes — know the risk before you commit.
+  </Card>
+  <Card title="Multi-file rename" icon="pen-to-square">
+    Coordinated rename with graph + text search, confidence-tagged edits for review.
+  </Card>
+  <Card title="11 languages" icon="code">
+    TypeScript, JavaScript, Python, Java, C, C++, C#, Go, Rust, PHP, Swift.
+  </Card>
+  <Card title="100% local" icon="lock">
+    Everything runs locally. No network calls. Your code never leaves your machine.
+  </Card>
+</CardGroup>
+
+## What your AI agent gets
+
+When you connect GitNexus via MCP, your AI agent gets:
+
+- **7 tools**: `list_repos`, `query`, `context`, `impact`, `detect_changes`, `rename`, `cypher`
+- **6 resource types**: repos, clusters, processes, schema, and more
+- **2 MCP prompts**: `detect_impact`, `generate_map`
+- **4 agent skills**: exploring, debugging, impact analysis, refactoring
+
+See the [MCP integration guide](/mcp/overview) for full details.
+
+## Get started
+
+<Steps>
+  <Step title="Index your repository">
+    Run this from your repo root:
+    ```bash
+    npx gitnexus analyze
+    ```
+  </Step>
+  <Step title="Configure MCP">
+    Auto-detect and configure your editors:
+    ```bash
+    npx gitnexus setup
+    ```
+  </Step>
+  <Step title="Start coding">
+    Your AI agent now has deep codebase awareness. Try asking it to trace a function or analyze impact.
+  </Step>
+</Steps>
+
+Ready to dive in? Check out the [quickstart guide](/quickstart).
+
+## Community
+
+<CardGroup cols={2}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/AAsRVT6fGb">
+    Join the official Discord to discuss ideas, issues, and more.
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/abhigyanpatwari/GitNexus">
+    Star the repo, report issues, or contribute.
+  </Card>
+</CardGroup>
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=abhigyanpatwari/GitNexus&type=date&legend=top-left)](https://www.star-history.com/#abhigyanpatwari/GitNexus&type=date&legend=top-left)
+
+## Privacy & security
+
+- **CLI**: Everything runs locally on your machine. No network calls. Index stored in `.gitnexus/` (gitignored). Global registry at `~/.gitnexus/` stores only paths and metadata.
+- **Web**: Everything runs in your browser. No code uploaded to any server. API keys stored in localStorage only.
+- Open source — audit the code yourself.

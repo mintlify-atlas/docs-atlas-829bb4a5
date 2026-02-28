@@ -1,0 +1,121 @@
+---
+title: gitnexus analyze
+description: Index a repository and build the knowledge graph
+---
+
+## Syntax
+
+```bash
+gitnexus analyze [path]
+```
+
+## Description
+
+Indexes a repository and stores the knowledge graph in `.gitnexus/`. This is the main command for building GitNexus's code intelligence.
+
+The analyze command performs a multi-phase indexing pipeline:
+
+1. **Scanning files** — Walks the file tree and maps folder/file relationships
+2. **Building structure** — Extracts the repository structure
+3. **Parsing code** — Extracts functions, classes, methods, and interfaces using Tree-sitter ASTs
+4. **Resolving imports** — Resolves import statements across files with language-aware logic
+5. **Tracing calls** — Maps function calls and call chains
+6. **Extracting inheritance** — Identifies class hierarchies and interface implementations
+7. **Detecting communities** — Groups related symbols into functional clusters
+8. **Detecting processes** — Traces execution flows from entry points through call chains
+9. **Creating search indexes** — Builds full-text search indexes for fast retrieval
+10. **Generating embeddings** — Creates semantic embeddings for hybrid search (optional)
+
+The result is a KuzuDB graph database stored locally in `.gitnexus/` with full-text search and optional semantic embeddings.
+
+## Options
+
+<ParamField path="path" type="string" optional>
+  Path to the repository to index. Defaults to the current directory's git root.
+</ParamField>
+
+<ParamField path="--force" type="boolean" optional>
+  Force full re-index even if the index is up to date with the current commit.
+</ParamField>
+
+<ParamField path="--embeddings" type="boolean" optional>
+  Enable embedding generation for semantic search. Disabled by default.
+  
+  Embeddings are automatically skipped for repositories with more than 50,000 nodes to avoid long indexing times.
+</ParamField>
+
+## Usage Examples
+
+### Index current repository
+
+```bash
+gitnexus analyze
+```
+
+### Index a specific repository
+
+```bash
+gitnexus analyze /path/to/repo
+```
+
+### Force full re-index
+
+```bash
+gitnexus analyze --force
+```
+
+### Enable semantic embeddings
+
+```bash
+gitnexus analyze --embeddings
+```
+
+## Output Example
+
+```
+GitNexus Analyzer
+
+████████████████████████████████████████ 100% | Done
+
+Repository indexed successfully (45.3s)
+
+1,348 nodes | 3,469 edges | 42 clusters | 104 flows
+KuzuDB 12.4s | FTS 2.1s | Embeddings off (use --embeddings to enable)
+/Users/dev/projects/my-app
+Context: AGENTS.md, CLAUDE.md
+Hooks: registered PreToolUse hook for Claude Code
+```
+
+## Automatic Setup
+
+The analyze command automatically:
+
+- **Registers the repository** in the global registry (`~/.gitnexus/registry.json`)
+- **Adds `.gitnexus/` to `.gitignore`** so indexes are never committed
+- **Generates AI context files** (`AGENTS.md`, `CLAUDE.md`) with codebase overview
+- **Installs agent skills** to `.claude/skills/` for Claude Code integration
+- **Registers Claude Code hooks** for automatic context enrichment
+
+## Index Staleness
+
+The analyze command compares the current git commit with the last indexed commit. If they match and `--force` is not used, the command exits early with "Already up to date".
+
+To check if your index is stale:
+
+```bash
+gitnexus status
+```
+
+## Performance
+
+The command automatically allocates 8GB heap for large repositories (e.g., Linux kernel). If the process is below this limit, it re-spawns itself with `--max-old-space-size=8192`.
+
+## Embedding Cache
+
+When re-indexing with `--embeddings`, the command caches existing embeddings and only generates embeddings for new or modified symbols. This significantly speeds up incremental re-indexing.
+
+## Related Commands
+
+- [`gitnexus status`](/api/commands/status) — Check index status and staleness
+- [`gitnexus clean`](/api/commands/clean) — Delete the index
+- [`gitnexus list`](/api/commands/list) — List all indexed repositories

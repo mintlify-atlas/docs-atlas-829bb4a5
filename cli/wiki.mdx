@@ -1,0 +1,372 @@
+---
+title: gitnexus wiki
+description: Generate LLM-powered documentation from the knowledge graph
+---
+
+The `wiki` command generates comprehensive documentation for a repository by analyzing the knowledge graph with an LLM.
+
+## Usage
+
+```bash
+gitnexus wiki [path] [options]
+```
+
+## Arguments
+
+<ParamField path="path" type="string" optional>
+  Path to the repository to document. Defaults to current directory's git root.
+</ParamField>
+
+## Options
+
+<ParamField query="force" type="boolean" default="false">
+  Force full regeneration even if wiki is up to date.
+  
+  **Flag:** `-f, --force`
+</ParamField>
+
+<ParamField query="model" type="string" default="minimax/minimax-m2.5">
+  LLM model name. Supports OpenAI, OpenRouter, or any OpenAI-compatible API.
+  
+  **Flag:** `--model <model>`
+  
+  **Examples:**
+  - `gpt-4o-mini` (OpenAI)
+  - `minimax/minimax-m2.5` (OpenRouter)
+  - `llama3` (Local via Ollama)
+</ParamField>
+
+<ParamField query="baseUrl" type="string" default="https://openrouter.ai/api/v1">
+  LLM API base URL.
+  
+  **Flag:** `--base-url <url>`
+  
+  **Providers:**
+  - OpenAI: `https://api.openai.com/v1`
+  - OpenRouter: `https://openrouter.ai/api/v1`
+  - Ollama: `http://localhost:11434/v1`
+</ParamField>
+
+<ParamField query="apiKey" type="string">
+  LLM API key. Saved to `~/.gitnexus/config.json` for future use.
+  
+  **Flag:** `--api-key <key>`
+  
+  **Alternatively, set environment variable:**
+  - `GITNEXUS_API_KEY`
+  - `OPENAI_API_KEY`
+</ParamField>
+
+<ParamField query="concurrency" type="number" default="3">
+  Number of parallel LLM calls.
+  
+  **Flag:** `--concurrency <n>`
+</ParamField>
+
+<ParamField query="gist" type="boolean" default="false">
+  Publish the generated wiki as a public GitHub Gist for easy viewing and sharing.
+  
+  **Flag:** `--gist`
+  
+  **Requires:** GitHub CLI (`gh`) installed and authenticated
+</ParamField>
+
+## Examples
+
+### Basic Usage
+
+Generate wiki for the current repository:
+
+```bash
+cd my-project
+gitnexus wiki
+```
+
+**First Run (Interactive Setup):**
+
+```
+  GitNexus Wiki Generator
+
+  No LLM configured. Let's set it up.
+
+  Supports OpenAI, OpenRouter, or any OpenAI-compatible API.
+
+  [1] OpenAI (api.openai.com)
+  [2] OpenRouter (openrouter.ai)
+  [3] Custom endpoint
+
+  Select provider (1/2/3): 2
+  Model (default: minimax/minimax-m2.5): 
+  API key: ****************************************
+  Config saved to ~/.gitnexus/config.json
+```
+
+### Custom Model
+
+```bash
+gitnexus wiki --model gpt-4o-mini
+```
+
+### Local LLM (Ollama)
+
+```bash
+gitnexus wiki --base-url http://localhost:11434/v1 --model llama3
+```
+
+### Force Regeneration
+
+```bash
+gitnexus wiki --force
+```
+
+### Publish as Gist
+
+```bash
+gitnexus wiki --gist
+```
+
+### Save API Key
+
+```bash
+gitnexus wiki --api-key sk-...
+```
+
+Key is saved to `~/.gitnexus/config.json` and reused for future runs.
+
+## Output
+
+The command displays a progress bar with phase updates:
+
+```
+  GitNexus Wiki Generator
+
+  ████████████████████░░░░ 85% | Generating modules (24/32)
+```
+
+### Successful Generation
+
+```
+  Wiki generated successfully (127.3s)
+
+  Mode: full
+  Pages: 32
+  Output: /Users/dev/my-project/.gitnexus/wiki
+  Viewer: /Users/dev/my-project/.gitnexus/wiki/index.html
+
+  Publish wiki as a GitHub Gist for easy viewing? (Y/n): y
+
+  Publishing to GitHub Gist...
+  Gist:   https://gist.github.com/user/abc123
+  Viewer: https://gistcdn.githack.com/user/abc123/raw/index.html
+```
+
+### Already Up to Date
+
+```
+  Wiki is already up to date.
+  Viewer: /Users/dev/my-project/.gitnexus/wiki/index.html
+```
+
+## Generated Files
+
+Wiki output is saved to `.gitnexus/wiki/`:
+
+```
+.gitnexus/wiki/
+├── index.html           # Single-file viewer (open in browser)
+├── README.md            # Overview
+├── modules/
+│   ├── authentication.md
+│   ├── database.md
+│   └── ...
+└── architecture.md      # High-level architecture
+```
+
+### Viewing the Wiki
+
+Open `index.html` in your browser:
+
+```bash
+open .gitnexus/wiki/index.html  # macOS
+xdg-open .gitnexus/wiki/index.html  # Linux
+start .gitnexus/wiki/index.html  # Windows
+```
+
+## How It Works
+
+### Phase 1: Graph Analysis (0-20%)
+
+1. Loads the knowledge graph from `.gitnexus/db`
+2. Identifies functional modules (communities)
+3. Extracts entry points and execution flows (processes)
+
+### Phase 2: Module Generation (20-90%)
+
+For each module:
+
+1. **Query the graph** for symbols, relationships, and processes
+2. **Call LLM** with structured context
+3. **Generate documentation** (purpose, components, flows)
+4. **Save markdown** to `modules/{module}.md`
+
+**Concurrency:** Multiple modules are processed in parallel (default: 3).
+
+### Phase 3: Architecture Overview (90-100%)
+
+Generates high-level architecture documentation by synthesizing module relationships.
+
+### Phase 4: HTML Viewer Generation
+
+Compiles all markdown files into a single-file HTML viewer with:
+
+- Sidebar navigation
+- Full-text search
+- Syntax highlighting
+- Responsive design
+
+## LLM Configuration
+
+### Providers
+
+| Provider | Base URL | Model Example |
+|----------|----------|---------------|
+| **OpenAI** | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| **OpenRouter** | `https://openrouter.ai/api/v1` | `minimax/minimax-m2.5` |
+| **Ollama** | `http://localhost:11434/v1` | `llama3` |
+| **Custom** | Your URL | Your model |
+
+### Default Model
+
+**`minimax/minimax-m2.5`** via OpenRouter — fast, cheap, and high-quality for documentation generation.
+
+### Cost Estimates
+
+| Repository Size | Modules | Tokens | Cost (OpenRouter) |
+|----------------|---------|--------|-------------------|
+| Small (< 100 files) | 5-10 | 50k | $0.05 |
+| Medium (100-1,000 files) | 10-20 | 200k | $0.20 |
+| Large (1,000-10,000 files) | 20-50 | 500k | $0.50 |
+
+Costs are approximate. OpenRouter's `minimax/minimax-m2.5` is optimized for cost.
+
+## GitHub Gist Publishing
+
+The `--gist` flag publishes the HTML viewer to a public GitHub Gist.
+
+### Requirements
+
+1. **GitHub CLI (`gh`)** installed: https://cli.github.com
+2. **Authenticated:** `gh auth login`
+
+### Automatic Publishing
+
+If `--gist` is omitted, you'll be prompted after generation:
+
+```
+Publish wiki as a GitHub Gist for easy viewing? (Y/n): 
+```
+
+### Output
+
+```
+Gist:   https://gist.github.com/user/abc123
+Viewer: https://gistcdn.githack.com/user/abc123/raw/index.html
+```
+
+Share the **Viewer** URL for instant access (no GitHub login required).
+
+## Caching and Incremental Updates
+
+Wiki generation tracks the last indexed commit. If the repository hasn't changed:
+
+```
+Wiki is already up to date.
+```
+
+Use `--force` to regenerate:
+
+```bash
+gitnexus wiki --force
+```
+
+## Troubleshooting
+
+### "No GitNexus index found"
+
+Run `gitnexus analyze` first:
+
+```bash
+gitnexus analyze
+gitnexus wiki
+```
+
+### "No LLM API key found"
+
+Provide an API key:
+
+```bash
+gitnexus wiki --api-key sk-...
+```
+
+Or set an environment variable:
+
+```bash
+export GITNEXUS_API_KEY=sk-...
+gitnexus wiki
+```
+
+### LLM API Error (401 Unauthorized)
+
+Your API key is invalid. Reconfigure:
+
+```bash
+gitnexus wiki --api-key sk-new-key
+```
+
+### Failed Modules
+
+```
+Failed modules (3):
+  - authentication
+  - billing
+  - notifications
+Re-run to retry failed modules (pages will be regenerated).
+```
+
+**Solution:**
+
+```bash
+gitnexus wiki  # Retries only failed modules
+```
+
+### Gist Publishing Fails
+
+Ensure GitHub CLI is authenticated:
+
+```bash
+gh auth status
+gh auth login  # If not authenticated
+```
+
+## Performance
+
+| Repository Size | Modules | Time (concurrency=3) |
+|----------------|---------|----------------------|
+| Small (< 100 files) | 5-10 | 30-60s |
+| Medium (100-1,000 files) | 10-20 | 1-3 min |
+| Large (1,000-10,000 files) | 20-50 | 3-10 min |
+
+Increase concurrency for faster generation:
+
+```bash
+gitnexus wiki --concurrency 10
+```
+
+<Warning>
+Higher concurrency = higher LLM costs and rate limit risk.
+</Warning>
+
+## See Also
+
+- [gitnexus analyze](/cli/analyze) — Index repository first
+- [Web UI Overview](/web/overview) — Alternative documentation viewer

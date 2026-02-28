@@ -1,0 +1,163 @@
+---
+title: list_repos
+description: List all indexed repositories available to GitNexus
+---
+
+## Overview
+
+The `list_repos` tool discovers all repositories that have been indexed by GitNexus. This is the essential first step when working with multiple repositories, providing metadata about each indexed repo including stats, commit info, and indexing status.
+
+<Info>
+  **When to use**: First step when multiple repos are indexed, or to discover available repos.
+  
+  **Next step**: READ `gitnexus://repo/{name}/context` for the repo you want to work with.
+</Info>
+
+## Parameters
+
+This tool takes no parameters.
+
+## Response
+
+Returns an array of repository objects, each containing:
+
+<ResponseField name="name" type="string" required>
+  Repository name (derived from path)
+</ResponseField>
+
+<ResponseField name="path" type="string" required>
+  Absolute path to the repository on disk
+</ResponseField>
+
+<ResponseField name="indexedAt" type="string" required>
+  ISO 8601 timestamp of when the repo was last indexed
+</ResponseField>
+
+<ResponseField name="lastCommit" type="object">
+  Information about the most recent commit
+  
+  <Expandable title="properties">
+    <ResponseField name="hash" type="string">
+      Git commit SHA
+    </ResponseField>
+    
+    <ResponseField name="message" type="string">
+      Commit message
+    </ResponseField>
+    
+    <ResponseField name="author" type="string">
+      Commit author
+    </ResponseField>
+    
+    <ResponseField name="date" type="string">
+      Commit timestamp
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="stats" type="object">
+  Repository indexing statistics
+  
+  <Expandable title="properties">
+    <ResponseField name="symbols" type="number">
+      Total number of indexed symbols (functions, classes, methods, etc.)
+    </ResponseField>
+    
+    <ResponseField name="relationships" type="number">
+      Total number of relationships (calls, imports, etc.)
+    </ResponseField>
+    
+    <ResponseField name="processes" type="number">
+      Number of execution flows traced
+    </ResponseField>
+    
+    <ResponseField name="files" type="number">
+      Number of indexed files
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Usage
+
+### Basic Usage
+
+```json
+{
+  "name": "list_repos"
+}
+```
+
+### Example Response
+
+```json
+[
+  {
+    "name": "my-app",
+    "path": "/Users/dev/projects/my-app",
+    "indexedAt": "2024-03-15T10:30:00Z",
+    "lastCommit": {
+      "hash": "a1b2c3d4",
+      "message": "Add payment processing",
+      "author": "Jane Doe",
+      "date": "2024-03-15T09:00:00Z"
+    },
+    "stats": {
+      "symbols": 918,
+      "relationships": 2847,
+      "processes": 45,
+      "files": 127
+    }
+  },
+  {
+    "name": "api-gateway",
+    "path": "/Users/dev/projects/api-gateway",
+    "indexedAt": "2024-03-14T16:20:00Z",
+    "stats": {
+      "symbols": 342,
+      "relationships": 891,
+      "processes": 18,
+      "files": 54
+    }
+  }
+]
+```
+
+## Multi-Repo Workflow
+
+When multiple repositories are indexed, you **must** specify the `repo` parameter on other tools to target the correct repository:
+
+```javascript
+// 1. Discover available repos
+list_repos()
+
+// 2. Target specific repo in subsequent calls
+query({ query: "auth", repo: "my-app" })
+context({ name: "validateUser", repo: "my-app" })
+impact({ target: "processPayment", direction: "upstream", repo: "my-app" })
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always start with list_repos">
+    When working with multiple repositories, call `list_repos` first to understand what's available and ensure you're targeting the correct repo in subsequent calls.
+  </Accordion>
+  
+  <Accordion title="Check indexing freshness">
+    Compare `indexedAt` with `lastCommit.date` to identify stale indexes. If the index is outdated, run `npx gitnexus analyze` to refresh.
+  </Accordion>
+  
+  <Accordion title="Review stats for context">
+    Use the stats to understand repository size and complexity before diving into queries. Large symbol counts may require more focused queries.
+  </Accordion>
+</AccordionGroup>
+
+## Related Tools
+
+- [query](/api/tools/query) - Search for execution flows after identifying the target repo
+- [context](/api/tools/context) - Get detailed symbol information within a specific repo
+
+## Related Resources
+
+- `gitnexus://repos` - Alternative way to list repos via MCP resources
+- `gitnexus://repo/{name}/context` - Detailed repo context including staleness warnings

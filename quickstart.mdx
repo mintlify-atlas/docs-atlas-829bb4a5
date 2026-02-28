@@ -1,80 +1,275 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get GitNexus up and running in minutes
 ---
 
-## Get started in three steps
+Get GitNexus indexing your codebase and connected to your AI editor in under 5 minutes.
 
-Get your documentation site running locally and make your first customization.
+## Fast path
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Index your repository">
+    Run from your repository root:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```bash
+    npx gitnexus analyze
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    This command:
+    - Indexes your codebase into a knowledge graph
+    - Installs agent skills to `.claude/skills/`
+    - Registers Claude Code hooks
+    - Creates `AGENTS.md` / `CLAUDE.md` context files
+    - Adds the repo to `~/.gitnexus/registry.json`
+  </Step>
+  
+  <Step title="Configure your editor">
+    Run the one-time setup:
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    npx gitnexus setup
+    ```
+    
+    This auto-detects your editors and writes the correct MCP configuration.
+  </Step>
+  
+  <Step title="Restart your editor">
+    Restart your AI coding assistant to load the MCP server and skills.
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+That's it! Your agent now has deep codebase awareness through GitNexus.
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+## What your agent gets
 
-### Step 3: Go live
+### 7 MCP Tools
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+| Tool | What It Does |
+|------|-------------|
+| `list_repos` | Discover all indexed repositories |
+| `query` | Process-grouped hybrid search (BM25 + semantic + RRF) |
+| `context` | 360-degree symbol view — categorized refs, process participation |
+| `impact` | Blast radius analysis with depth grouping and confidence |
+| `detect_changes` | Git-diff impact — maps changed lines to affected processes |
+| `rename` | Multi-file coordinated rename with graph + text search |
+| `cypher` | Raw Cypher graph queries |
+
+### 6 Resource Types
+
+| Resource | Purpose |
+|----------|---------|
+| `gitnexus://repos` | List all indexed repositories |
+| `gitnexus://repo/{name}/context` | Codebase stats and staleness check |
+| `gitnexus://repo/{name}/clusters` | Functional clusters with cohesion scores |
+| `gitnexus://repo/{name}/cluster/{name}` | Cluster members and details |
+| `gitnexus://repo/{name}/processes` | All execution flows |
+| `gitnexus://repo/{name}/process/{name}` | Full process trace with steps |
+
+### 4 Agent Skills
+
+Automatically installed to `.claude/skills/gitnexus/`:
+
+- **Exploring** — Navigate unfamiliar code using the knowledge graph
+- **Debugging** — Trace bugs through call chains
+- **Impact Analysis** — Analyze blast radius before changes
+- **Refactoring** — Plan safe refactors using dependency mapping
+
+## Example: Query tool
+
+Ask your agent to search for authentication-related code:
+
+```typescript
+// Agent calls:
+query({
+  query: "authentication middleware",
+  context: "user login flow",
+  limit: 3
+})
+```
+
+Response shows process-grouped results:
+
+```json
+{
+  "processes": [
+    {
+      "summary": "LoginFlow",
+      "priority": 0.042,
+      "symbol_count": 4,
+      "process_type": "cross_community",
+      "step_count": 7
+    }
+  ],
+  "process_symbols": [
+    {
+      "name": "validateUser",
+      "type": "Function",
+      "filePath": "src/auth/validate.ts",
+      "process_id": "proc_login",
+      "step_index": 2
+    }
+  ],
+  "definitions": [
+    {
+      "name": "AuthConfig",
+      "type": "Interface",
+      "filePath": "src/types/auth.ts"
+    }
+  ]
+}
+```
+
+## Example: Impact tool
+
+Check what breaks if you change a function:
+
+```typescript
+// Agent calls:
+impact({
+  target: "UserService",
+  direction: "upstream",
+  minConfidence: 0.8
+})
+```
+
+Response shows blast radius:
+
+```
+TARGET: Class UserService (src/services/user.ts)
+
+UPSTREAM (what depends on this):
+  Depth 1 (WILL BREAK):
+    handleLogin [CALLS 90%] -> src/api/auth.ts:45
+    handleRegister [CALLS 90%] -> src/api/auth.ts:78
+    UserController [CALLS 85%] -> src/controllers/user.ts:12
+  Depth 2 (LIKELY AFFECTED):
+    authRouter [IMPORTS] -> src/routes/auth.ts
+```
+
+## Manual editor setup
+
+If you prefer manual configuration instead of `gitnexus setup`:
+
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add gitnexus -- npx -y gitnexus@latest mcp
+    ```
+    
+    Claude Code gets full integration: MCP + skills + PreToolUse hooks.
+  </Tab>
+  
+  <Tab title="Cursor">
+    Add to `~/.cursor/mcp.json`:
+    
+    ```json
+    {
+      "mcpServers": {
+        "gitnexus": {
+          "command": "npx",
+          "args": ["-y", "gitnexus@latest", "mcp"]
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="OpenCode">
+    Add to `~/.config/opencode/config.json`:
+    
+    ```json
+    {
+      "mcp": {
+        "gitnexus": {
+          "command": "npx",
+          "args": ["-y", "gitnexus@latest", "mcp"]
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Windsurf">
+    Add to `~/.codeium/windsurf/mcp.json`:
+    
+    ```json
+    {
+      "mcpServers": {
+        "gitnexus": {
+          "command": "npx",
+          "args": ["-y", "gitnexus@latest", "mcp"]
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Editor support
+
+| Editor | MCP | Skills | Hooks (auto-augment) | Support |
+|--------|-----|--------|---------------------|---------|
+| **Claude Code** | ✓ | ✓ | ✓ (PreToolUse) | **Full** |
+| **Cursor** | ✓ | ✓ | — | MCP + Skills |
+| **Windsurf** | ✓ | — | — | MCP |
+| **OpenCode** | ✓ | ✓ | — | MCP + Skills |
+
+<Note>
+Claude Code gets the deepest integration with PreToolUse hooks that automatically enrich `grep`, `glob`, and `bash` calls with knowledge graph context.
+</Note>
+
+## Multi-repo workflow
+
+GitNexus supports indexing multiple repositories:
+
+<Steps>
+  <Step title="Index each repository">
+    ```bash
+    cd ~/projects/api && npx gitnexus analyze
+    cd ~/projects/web && npx gitnexus analyze
+    cd ~/projects/lib && npx gitnexus analyze
+    ```
+  </Step>
+  
+  <Step title="List indexed repos">
+    ```bash
+    npx gitnexus list
+    ```
+    
+    Shows all registered repositories with stats.
+  </Step>
+  
+  <Step title="Use in agent">
+    With multiple repos indexed, the MCP server serves them all automatically.
+    
+    When only one repo is indexed, the `repo` parameter is optional:
+    ```typescript
+    query({ query: "auth" })
+    ```
+    
+    With multiple repos, specify which one:
+    ```typescript
+    query({ query: "auth", repo: "api" })
+    ```
+  </Step>
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Core Concepts" icon="lightbulb" href="/concepts/knowledge-graph">
+    Learn how the knowledge graph works
+  </Card>
+  
+  <Card title="MCP Integration" icon="plug" href="/mcp/overview">
+    Deep dive into MCP tools and resources
+  </Card>
+  
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Explore all CLI commands
+  </Card>
+  
+  <Card title="Agent Skills" icon="brain" href="/skills/overview">
+    Master the 4 agent skills
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

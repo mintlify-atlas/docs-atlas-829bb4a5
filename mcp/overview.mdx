@@ -1,0 +1,117 @@
+---
+title: MCP Integration Overview
+description: Connect GitNexus to your AI editor using the Model Context Protocol
+---
+
+GitNexus exposes its knowledge graph through the **Model Context Protocol (MCP)**, enabling AI editors to query code intelligence directly during conversations.
+
+## What is MCP?
+
+The Model Context Protocol is a standard interface for connecting AI assistants to external data sources and tools. GitNexus implements MCP to provide:
+
+- **7 code intelligence tools** for querying the knowledge graph
+- **7 resources** for structured on-demand data
+- **2 prompts** for guided workflows (impact analysis, architecture mapping)
+
+## Available Tools
+
+Your AI agent gets these tools automatically when connected:
+
+| Tool | Purpose | Multi-Repo |
+|------|---------|------------|
+| `list_repos` | Discover all indexed repositories | — |
+| `query` | Process-grouped hybrid search (BM25 + semantic + RRF) | Optional |
+| `context` | 360-degree symbol view with categorized refs and process participation | Optional |
+| `impact` | Blast radius analysis with depth grouping and confidence scores | Optional |
+| `detect_changes` | Git-diff impact — maps changed lines to affected processes | Optional |
+| `rename` | Multi-file coordinated rename with graph + text search | Optional |
+| `cypher` | Raw Cypher graph queries against the KuzuDB database | Optional |
+
+<Note>
+**Multi-Repo Support:** With one indexed repo, the `repo` parameter is optional. With multiple repos, specify which one: `query({query: "auth", repo: "my-app"})`.
+</Note>
+
+## Available Resources
+
+Lightweight reads (100-500 tokens) for navigation:
+
+| Resource | Content |
+|----------|----------|
+| `gitnexus://repos` | List all indexed repositories (read first) |
+| `gitnexus://repo/{name}/context` | Codebase stats, staleness check, available tools |
+| `gitnexus://repo/{name}/clusters` | All functional clusters with cohesion scores |
+| `gitnexus://repo/{name}/cluster/{name}` | Cluster members and details |
+| `gitnexus://repo/{name}/processes` | All execution flows |
+| `gitnexus://repo/{name}/process/{name}` | Full process trace with steps |
+| `gitnexus://repo/{name}/schema` | Graph schema for Cypher queries |
+
+## MCP Prompts
+
+GitNexus provides two guided workflows:
+
+| Prompt | Purpose |
+|--------|----------|
+| `detect_impact` | Pre-commit change analysis — scope, affected processes, risk level |
+| `generate_map` | Architecture documentation from the knowledge graph with mermaid diagrams |
+
+## Editor Support
+
+| Editor | MCP | Skills | Hooks (auto-augment) | Support Level |
+|--------|-----|--------|---------------------|---------------|
+| **Claude Code** | ✓ | ✓ | ✓ (PreToolUse) | **Full** |
+| **Cursor** | ✓ | ✓ | — | MCP + Skills |
+| **Windsurf** | ✓ | — | — | MCP |
+| **OpenCode** | ✓ | ✓ | — | MCP + Skills |
+
+<Info>
+**Claude Code** gets the deepest integration: MCP tools + agent skills + PreToolUse hooks that automatically enrich grep/glob/bash calls with knowledge graph context.
+</Info>
+
+## Setup Options
+
+<CardGroup cols={2}>
+  <Card title="Automatic Setup" icon="wand-magic-sparkles" href="/mcp/editor-setup">
+    Run `gitnexus setup` to auto-configure all detected editors
+  </Card>
+  
+  <Card title="Claude Code" icon="code" href="/mcp/claude-code">
+    Full integration with MCP, skills, and PreToolUse hooks
+  </Card>
+  
+  <Card title="Cursor" icon="cursor" href="/mcp/cursor">
+    MCP and skills configuration for Cursor
+  </Card>
+  
+  <Card title="Multi-Repo Usage" icon="layer-group" href="/mcp/multi-repo">
+    Global registry and multi-repo architecture
+  </Card>
+</CardGroup>
+
+## How It Works
+
+When you run `gitnexus analyze` in a repository:
+
+1. **Indexes the codebase** into a KuzuDB graph database (stored in `.gitnexus/`)
+2. **Registers the repo** in `~/.gitnexus/registry.json` (global registry)
+3. **Installs agent skills** to teach AI agents how to use the tools
+4. **Creates context files** (`AGENTS.md`, `CLAUDE.md`) for immediate use
+
+The MCP server runs via `npx gitnexus mcp` and serves **all indexed repositories** from the global registry. Your editor spawns this process automatically when MCP is configured.
+
+## Next Steps
+
+<Steps>
+  <Step title="Index your repository">
+    Run `npx gitnexus analyze` in your repo root
+  </Step>
+  
+  <Step title="Configure MCP">
+    Choose your setup method:
+    - Run `npx gitnexus setup` for automatic configuration
+    - Or follow the [editor-specific guides](/mcp/editor-setup)
+  </Step>
+  
+  <Step title="Start using tools">
+    Your AI agent now has access to all GitNexus tools and resources
+  </Step>
+</Steps>

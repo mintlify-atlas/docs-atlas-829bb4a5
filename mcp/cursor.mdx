@@ -1,0 +1,349 @@
+---
+title: Cursor Setup
+description: Configure MCP and skills for Cursor
+---
+
+Cursor supports **MCP tools** and **agent skills**, providing a powerful GitNexus integration.
+
+<Info>
+**Support Level:** MCP + Skills (hooks not supported)
+</Info>
+
+## Quick Setup
+
+Run the setup command to configure everything automatically:
+
+```bash
+npx gitnexus setup
+```
+
+This will:
+
+1. Detect Cursor installation (checks for `~/.cursor/`)
+2. Write `~/.cursor/mcp.json` with GitNexus MCP configuration
+3. Install skills to `~/.cursor/skills/gitnexus/`
+
+<Accordion title="Example output">
+```
+GitNexus Setup
+==============
+
+Configured:
+  + Cursor
+  + Cursor skills (6 skills → ~/.cursor/skills/)
+
+Summary:
+  MCP configured for: Cursor
+  Skills installed to: Cursor skills
+
+Next steps:
+  1. cd into any git repo
+  2. Run: gitnexus analyze
+  3. Open the repo in your editor — MCP is ready!
+```
+</Accordion>
+
+## Manual MCP Configuration
+
+Create or edit `~/.cursor/mcp.json` (global configuration):
+
+```json
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+<Note>
+**Global Configuration:** This configuration is **global** — it works for all projects on your machine. Cursor will spawn the MCP server automatically.
+</Note>
+
+### Windows Configuration
+
+On Windows, use:
+
+```json
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+The `gitnexus setup` command handles this automatically.
+
+## Agent Skills
+
+GitNexus provides 6 agent skill files for Cursor:
+
+| Skill | Purpose |
+|-------|----------|
+| `gitnexus-exploring` | Navigate unfamiliar code using the knowledge graph |
+| `gitnexus-debugging` | Trace bugs through call chains |
+| `gitnexus-impact-analysis` | Analyze blast radius before changes |
+| `gitnexus-refactoring` | Plan safe refactors using dependency mapping |
+| `gitnexus-guide` | General guidance on tool usage |
+| `gitnexus-cli` | CLI command reference |
+
+Skills are installed to `~/.cursor/skills/gitnexus-{skillName}/` by:
+
+- **`gitnexus setup`** — Global skills for all projects
+- **`gitnexus analyze`** — Project-level skills in `.cursor/skills/`
+
+<Tip>
+Cursor automatically discovers skills from both `~/.cursor/skills/` (global) and `.cursor/skills/` (project).
+</Tip>
+
+## Global vs Project Configuration
+
+### Global Configuration (Recommended)
+
+Global configuration applies to all projects:
+
+- **MCP:** `~/.cursor/mcp.json`
+- **Skills:** `~/.cursor/skills/gitnexus/`
+
+This is the recommended approach for most users.
+
+### Project Configuration
+
+Project configuration applies to a single repository:
+
+- **Skills:** `.cursor/skills/gitnexus/` (installed by `gitnexus analyze`)
+- **Context:** `AGENTS.md` (installed by `gitnexus analyze`)
+- **Rules:** `.cursorrules` (optional, for project-specific instructions)
+
+<Note>
+Cursor does **not** support project-level MCP configuration. MCP must be configured globally in `~/.cursor/mcp.json`.
+</Note>
+
+## Multi-Repo Support
+
+The MCP server automatically serves **all indexed repositories** from the global registry (`~/.gitnexus/registry.json`).
+
+### With One Indexed Repo
+
+The `repo` parameter is optional:
+
+```typescript
+// Both are equivalent
+query({ query: "auth" })
+query({ query: "auth", repo: "my-app" })
+```
+
+### With Multiple Indexed Repos
+
+Specify which repo to query:
+
+```typescript
+query({ query: "auth", repo: "backend" })
+context({ name: "validateUser", repo: "frontend" })
+impact({ target: "AuthService", direction: "upstream", repo: "shared" })
+```
+
+List all indexed repos:
+
+```typescript
+list_repos()
+```
+
+Or read the repos resource:
+
+```
+READ gitnexus://repos
+```
+
+## Verification
+
+Test your Cursor integration:
+
+<Steps>
+  <Step title="Index a repository">
+    ```bash
+    cd /path/to/your/repo
+    npx gitnexus analyze
+    ```
+  </Step>
+  
+  <Step title="Open in Cursor">
+    Open the repository in Cursor
+  </Step>
+  
+  <Step title="Test MCP connection">
+    Ask Cursor:
+    
+    > "List all indexed repositories"
+    
+    This should trigger the `list_repos` MCP tool.
+  </Step>
+  
+  <Step title="Test skills">
+    Ask Cursor:
+    
+    > "How should I use GitNexus to understand this codebase?"
+    
+    Cursor should reference the installed skills.
+  </Step>
+  
+  <Step title="Test resources">
+    Ask Cursor:
+    
+    > "Read gitnexus://repos"
+    
+    This should show your indexed repositories with stats.
+  </Step>
+</Steps>
+
+## Available Tools
+
+All 7 GitNexus tools are available in Cursor:
+
+| Tool | Purpose |
+|------|----------|
+| `list_repos` | Discover all indexed repositories |
+| `query` | Process-grouped hybrid search (BM25 + semantic + RRF) |
+| `context` | 360-degree symbol view with categorized refs |
+| `impact` | Blast radius analysis with depth grouping |
+| `detect_changes` | Git-diff impact analysis |
+| `rename` | Multi-file coordinated rename |
+| `cypher` | Raw Cypher graph queries |
+
+See [Tools Overview](/api/tools/query) for detailed usage.
+
+## Available Resources
+
+All 7 GitNexus resources are available:
+
+| Resource | Purpose |
+|----------|----------|
+| `gitnexus://repos` | List all indexed repositories |
+| `gitnexus://repo/{name}/context` | Codebase stats and staleness check |
+| `gitnexus://repo/{name}/clusters` | All functional clusters |
+| `gitnexus://repo/{name}/cluster/{name}` | Cluster details |
+| `gitnexus://repo/{name}/processes` | All execution flows |
+| `gitnexus://repo/{name}/process/{name}` | Process trace |
+| `gitnexus://repo/{name}/schema` | Graph schema for Cypher |
+
+See [Resources Overview](/resources/overview) for details.
+
+## Project Context Files
+
+When you run `gitnexus analyze`, two context files are created:
+
+### AGENTS.md
+
+Contains:
+- Codebase overview and stats
+- Tool reference table
+- Skills checklist
+- Graph schema reference
+
+Cursor reads this file automatically as project context.
+
+### .cursorrules (Optional)
+
+You can create `.cursorrules` to add project-specific instructions:
+
+```markdown
+# GitNexus Integration
+
+This project is indexed by GitNexus. Always start by:
+
+1. Reading gitnexus://repo/{name}/context to check staleness
+2. Using the appropriate skill for your task (see AGENTS.md)
+3. Following the skill's workflow and checklist
+
+Available skills:
+- gitnexus-exploring: Understand architecture
+- gitnexus-debugging: Trace bugs
+- gitnexus-impact-analysis: Blast radius before changes
+- gitnexus-refactoring: Safe refactoring workflows
+```
+
+## Updating GitNexus
+
+The MCP configuration uses `gitnexus@latest`, so you automatically get the latest version:
+
+```json
+"args": ["-y", "gitnexus@latest", "mcp"]
+```
+
+To force an update:
+
+```bash
+npm cache clean --force
+npx gitnexus@latest --version
+```
+
+Restart Cursor to pick up the new version.
+
+## Troubleshooting
+
+### MCP server not starting
+
+1. Verify Node.js: `node --version` (requires >= 18)
+2. Check npx works: `npx gitnexus --version`
+3. Test MCP manually: `npx gitnexus mcp` (should not exit immediately)
+4. Check `~/.cursor/mcp.json` syntax (must be valid JSON)
+
+### Tools not appearing
+
+1. Verify `~/.cursor/mcp.json` exists and has correct content
+2. Restart Cursor after configuration changes
+3. Check Cursor MCP logs (if available)
+
+### Skills not loading
+
+1. Verify skills directory: `ls ~/.cursor/skills/gitnexus-exploring/SKILL.md`
+2. Check skill format (must have `SKILL.md` filename)
+3. Restart Cursor
+
+### "No repositories indexed" error
+
+1. Run `npx gitnexus analyze` in your repository
+2. Verify index exists: `ls .gitnexus/meta.json`
+3. Check global registry: `cat ~/.gitnexus/registry.json`
+
+## Differences from Claude Code
+
+Cursor does **not** support:
+
+- **PreToolUse Hooks** — No automatic enrichment of grep/glob/bash calls
+- **Session Hooks** — No automatic session context injection
+
+Cursor **does** support:
+
+- **All MCP Tools** — Full access to query, context, impact, etc.
+- **All MCP Resources** — Can read all gitnexus:// resources
+- **Agent Skills** — Can load and follow skill workflows
+
+<Tip>
+To get knowledge graph enrichment in Cursor, explicitly use GitNexus tools in your queries. For example: "Use query to find auth code, then use context on the results."
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Using the Tools" icon="toolbox" href="/api/tools/query">
+    Learn how to use GitNexus tools effectively
+  </Card>
+  
+  <Card title="Multi-Repo Usage" icon="layer-group" href="/mcp/multi-repo">
+    Work with multiple indexed repositories
+  </Card>
+  
+  <Card title="Agent Skills" icon="graduation-cap" href="/skills/overview">
+    Understand the installed skill workflows
+  </Card>
+  
+  <Card title="Resources" icon="database" href="/api/resources/overview">
+    Explore MCP resources for structured data
+  </Card>
+</CardGroup>

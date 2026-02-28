@@ -1,0 +1,257 @@
+---
+title: Processes Resources
+description: Execution flows traced from entry points through call chains
+---
+
+## gitnexus://repo/{name}/processes
+
+### Resource URI
+
+```
+gitnexus://repo/{name}/processes
+```
+
+<ParamField path="name" type="string" required>
+  Repository name from `gitnexus://repos`
+</ParamField>
+
+### Description
+
+Returns all execution flows (processes) detected in the repository. Processes trace code execution paths from entry points through function call chains.
+
+**Processes** represent how code actually runs — user login flow, API request handling, database migration, etc.
+
+### Returns
+
+<ResponseField name="processes" type="array">
+  List of detected execution flows (top 20)
+  
+  <Expandable title="properties">
+    <ResponseField name="name" type="string">
+      Human-readable process label (heuristic-based)
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Process type: api, cli, event, init, or unknown
+    </ResponseField>
+    
+    <ResponseField name="steps" type="number">
+      Number of execution steps (function calls) in the trace
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### When to Use
+
+- **Understanding execution flows**: See how code actually runs
+- **Debugging**: Trace execution paths
+- **Impact analysis**: Identify affected workflows
+- **Documentation**: Generate flow diagrams
+- **Onboarding**: Learn major user journeys
+
+### Example Response
+
+#### With Processes
+
+```yaml
+processes:
+  - name: "User Login Flow"
+    type: api
+    steps: 12
+  - name: "Order Checkout"
+    type: api
+    steps: 23
+  - name: "Database Migration"
+    type: cli
+    steps: 8
+  - name: "Payment Processing"
+    type: event
+    steps: 15
+  - name: "Server Initialization"
+    type: init
+    steps: 34
+
+# Showing top 20 of 87 processes. Use gitnexus_query for deeper search.
+```
+
+#### No Processes
+
+```yaml
+processes: []
+# No processes detected. Run: gitnexus analyze
+```
+
+### Process Types
+
+GitNexus categorizes processes by their entry point:
+
+- **api**: HTTP request handlers, REST endpoints, GraphQL resolvers
+- **cli**: Command-line commands, scripts
+- **event**: Event handlers, message queue consumers, webhooks
+- **init**: Application initialization, startup sequences
+- **unknown**: Other execution flows
+
+---
+
+## gitnexus://repo/{name}/process/{processName}
+
+### Resource URI
+
+```
+gitnexus://repo/{name}/process/{processName}
+```
+
+<ParamField path="name" type="string" required>
+  Repository name from `gitnexus://repos`
+</ParamField>
+
+<ParamField path="processName" type="string" required>
+  Process name from the `processes` resource
+</ParamField>
+
+### Description
+
+Returns a step-by-step execution trace for a specific process, showing the exact sequence of function calls and their file locations.
+
+Use this to **trace an execution flow** from start to finish.
+
+### Returns
+
+<ResponseField name="name" type="string">
+  Process name
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Process type (api, cli, event, init, unknown)
+</ResponseField>
+
+<ResponseField name="step_count" type="number">
+  Total number of steps
+</ResponseField>
+
+<ResponseField name="trace" type="array">
+  Ordered list of execution steps
+  
+  Each step shows: `{stepNumber}: {symbolName} ({filePath})`
+</ResponseField>
+
+### When to Use
+
+- **After reading `processes`**: Deep-dive into specific flows
+- **Debugging**: Follow execution path to find bugs
+- **Understanding flow**: See exact call sequence
+- **Impact analysis**: Identify all functions in a critical path
+- **Documentation**: Generate sequence diagrams
+
+### Example Response
+
+```yaml
+name: "User Login Flow"
+type: api
+step_count: 12
+
+trace:
+  1: loginHandler (src/routes/auth.ts)
+  2: validateCredentials (src/auth/validate.ts)
+  3: hashPassword (src/auth/utils.ts)
+  4: findUserByEmail (src/db/users.ts)
+  5: comparePasswords (src/auth/utils.ts)
+  6: generateToken (src/auth/tokens.ts)
+  7: signJWT (src/auth/jwt.ts)
+  8: createSession (src/db/sessions.ts)
+  9: insertSession (src/db/queries.ts)
+  10: auditLog (src/logging/audit.ts)
+  11: sendWelcomeEmail (src/email/templates.ts)
+  12: returnResponse (src/routes/auth.ts)
+```
+
+### Error Response
+
+```yaml
+error: Process "InvalidName" not found
+```
+
+## Understanding Traces
+
+Each step in a trace represents:
+1. **Step number**: Execution order (1-based)
+2. **Symbol name**: Function or method being called
+3. **File path**: Location of the symbol
+
+The trace shows the **depth-first traversal** of the call graph from the entry point.
+
+## Workflow
+
+Typical process exploration workflow:
+
+<Steps>
+  <Step title="List All Processes">
+    Read `gitnexus://repo/{name}/processes` to see available flows
+  </Step>
+  
+  <Step title="Identify Critical Flows">
+    Look for API endpoints, important events, or areas you're working on
+  </Step>
+  
+  <Step title="Trace Execution">
+    Read `gitnexus://repo/{name}/process/{processName}` for specific flows
+  </Step>
+  
+  <Step title="Analyze Impact">
+    Use the `impact` tool on symbols in the trace to check blast radius
+  </Step>
+</Steps>
+
+## Use Cases
+
+### Debugging
+
+When tracing a bug in the login flow:
+```yaml
+# 1. Find the process
+Read: gitnexus://repo/my-app/processes
+
+# 2. Get the full trace
+Read: gitnexus://repo/my-app/process/User Login Flow
+
+# 3. Analyze suspicious steps
+Tool: context({name: "validateCredentials"})
+Tool: impact({target: "validateCredentials", direction: "upstream"})
+```
+
+### Impact Analysis
+
+Before modifying a function, check which processes it affects:
+```yaml
+# 1. List processes
+Read: gitnexus://repo/my-app/processes
+
+# 2. Check specific flows that might be affected
+Read: gitnexus://repo/my-app/process/User Login Flow
+Read: gitnexus://repo/my-app/process/Password Reset
+```
+
+### Documentation
+
+Generate flow diagrams:
+```yaml
+# 1. Get top processes
+Read: gitnexus://repo/my-app/processes
+
+# 2. Get traces for key flows
+Read: gitnexus://repo/my-app/process/Order Checkout
+Read: gitnexus://repo/my-app/process/Payment Processing
+
+# 3. Generate mermaid diagrams from traces
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Impact Tool" icon="radiation" href="/api/tools/impact">
+    Analyze blast radius of changes
+  </Card>
+  <Card title="Detect Changes Tool" icon="code-compare" href="/api/tools/detect-changes">
+    Map git diff to affected processes
+  </Card>
+</CardGroup>

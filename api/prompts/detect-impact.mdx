@@ -1,0 +1,241 @@
+---
+title: detect_impact
+description: Pre-commit change analysis with scope selection, affected processes, and risk assessment
+---
+
+## Overview
+
+The `detect_impact` prompt guides AI agents through a comprehensive pre-commit impact analysis workflow. It analyzes your current code changes, identifies affected execution flows, and provides a risk assessment.
+
+**Use this before committing** to understand the blast radius of your changes.
+
+## Parameters
+
+<ParamField path="scope" type="string" default="all">
+  What changes to analyze:
+  - `unstaged` — Only unstaged changes
+  - `staged` — Only staged changes
+  - `all` — All uncommitted changes (staged + unstaged)
+  - `compare` — Compare against a specific branch/commit (requires `base_ref`)
+</ParamField>
+
+<ParamField path="base_ref" type="string">
+  Branch or commit to compare against (required if scope is `compare`)
+  
+  Examples: `main`, `develop`, `HEAD~1`, `a1b2c3d`
+</ParamField>
+
+## What It Does
+
+The prompt instructs the agent to:
+
+1. **Run `detect_changes`** with the specified scope to find changed symbols and affected processes
+2. **Analyze critical symbols** using `context` tool to see full reference graph
+3. **Check blast radius** using `impact` tool for high-risk items
+4. **Generate risk report** with changes, affected processes, risk level, and recommendations
+
+## Usage
+
+### In Claude Desktop
+
+```
+Run the detect_impact prompt
+```
+
+Agent will ask for parameters or use defaults.
+
+### In Cursor/OpenCode
+
+Invoke the prompt from the MCP prompts menu, or reference it directly:
+
+```
+Use the detect_impact prompt to analyze my changes
+```
+
+### With Parameters
+
+```
+Run detect_impact with scope="staged"
+```
+
+```
+Run detect_impact comparing against main branch
+```
+
+## Example Workflow
+
+Here's what the agent does when you invoke this prompt:
+
+<Steps>
+  <Step title="Detect Changes">
+    Runs `detect_changes({scope: "all"})` to find modified symbols and affected processes
+    
+    ```yaml
+    changed_symbols:
+      - name: validateUser
+        file: src/auth/validate.ts
+        change_type: modified
+        affected_processes: ["User Login Flow", "Password Reset"]
+    ```
+  </Step>
+  
+  <Step title="Analyze Critical Symbols">
+    For each symbol in critical processes, runs `context({name: "validateUser"})` to see:
+    - All callers
+    - All callees
+    - Process participation
+    - Related symbols
+  </Step>
+  
+  <Step title="Check Blast Radius">
+    For high-risk symbols (many callers or cross-process usage), runs:
+    
+    ```
+    impact({target: "validateUser", direction: "upstream"})
+    ```
+    
+    To see what breaks at depth 1, 2, and 3.
+  </Step>
+  
+  <Step title="Generate Report">
+    Summarizes findings:
+    
+    ```markdown
+    # Impact Analysis
+    
+    ## Changes
+    - Modified `validateUser` in src/auth/validate.ts
+    - Modified `hashPassword` in src/auth/utils.ts
+    
+    ## Affected Processes
+    - User Login Flow (12 steps)
+    - Password Reset (8 steps)
+    - Admin Login (10 steps)
+    
+    ## Risk Level: HIGH
+    
+    `validateUser` has 23 upstream callers across 3 processes.
+    Breaking change could affect all authentication flows.
+    
+    ## Recommendations
+    1. Add tests for all 3 affected processes
+    2. Review upstream callers for compatibility
+    3. Consider deprecation path if changing signature
+    ```
+  </Step>
+</Steps>
+
+## Example Output
+
+The agent presents a structured risk report:
+
+```markdown
+# Pre-Commit Impact Analysis
+
+## Summary
+Analyzing all uncommitted changes in repository "my-app"
+
+## Changed Symbols
+1. **validateUser** (src/auth/validate.ts)
+   - Change: Modified function signature
+   - Callers: 23 direct, 47 indirect
+   - Processes: User Login Flow, Password Reset, Admin Login
+
+2. **hashPassword** (src/auth/utils.ts)
+   - Change: Updated hashing algorithm
+   - Callers: 5 direct, 12 indirect
+   - Processes: User Registration, Password Reset
+
+## Affected Processes
+
+### High-Risk Processes
+- **User Login Flow** (12 steps)
+  - Changed symbols: validateUser (step 2), hashPassword (step 3)
+  - Risk: Breaking change would prevent all user logins
+
+- **Password Reset** (8 steps)
+  - Changed symbols: validateUser (step 4), hashPassword (step 6)
+  - Risk: Could break password recovery
+
+### Medium-Risk Processes
+- **Admin Login** (10 steps)
+  - Changed symbols: validateUser (step 3)
+  - Risk: Admin access could be affected
+
+## Blast Radius
+
+### validateUser
+- **Depth 1** (WILL BREAK): 23 functions
+  - loginHandler, resetPasswordHandler, adminLoginHandler, ...
+- **Depth 2** (MAY BREAK): 47 functions
+- **Depth 3** (WATCH): 89 functions
+
+### hashPassword
+- **Depth 1** (WILL BREAK): 5 functions
+- **Depth 2** (MAY BREAK): 12 functions
+
+## Risk Assessment
+
+**Overall Risk: HIGH**
+
+- Core authentication functions modified
+- 3 critical processes affected
+- 70+ functions in blast radius
+- No breaking changes detected in signatures
+
+## Recommendations
+
+1. **Test Coverage**
+   - Add integration tests for all 3 affected processes
+   - Verify backward compatibility with existing callers
+
+2. **Review**
+   - Manually verify the 23 direct callers of validateUser
+   - Check if hashPassword algorithm change affects stored hashes
+
+3. **Deployment**
+   - Consider gradual rollout
+   - Monitor authentication metrics post-deploy
+
+4. **Documentation**
+   - Update API docs if function signatures changed
+   - Add migration guide if breaking
+```
+
+## When to Use
+
+<CardGroup cols={2}>
+  <Card title="Before Committing" icon="code-commit">
+    Run this before every commit to catch breaking changes
+  </Card>
+  
+  <Card title="Before PR" icon="code-pull-request">
+    Include the report in your PR description
+  </Card>
+  
+  <Card title="During Code Review" icon="magnifying-glass">
+    Use to understand reviewer's concerns about blast radius
+  </Card>
+  
+  <Card title="Before Deploy" icon="rocket">
+    Final check before merging to production
+  </Card>
+</CardGroup>
+
+## Comparison with Tools
+
+This prompt orchestrates multiple tools:
+
+| Tool | Purpose in Workflow |
+|------|--------------------|
+| `detect_changes` | Find what changed and affected processes |
+| `context` | Get 360-degree view of critical symbols |
+| `impact` | Calculate blast radius for high-risk items |
+
+The prompt provides the **workflow logic** while tools provide the **data**.
+
+## Next Steps
+
+<Card title="Detect Changes Tool" icon="code-compare" href="/api/tools/detect-changes">
+  Learn about the underlying tool used by this prompt
+</Card>

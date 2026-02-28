@@ -1,0 +1,200 @@
+---
+title: gitnexus cypher
+description: Execute raw Cypher queries against the knowledge graph
+---
+
+## Syntax
+
+```bash
+gitnexus cypher <query>
+```
+
+## Description
+
+Execute raw Cypher queries against the knowledge graph. This is a direct CLI wrapper for the [`cypher`](/api/tools/cypher) MCP tool.
+
+Use this for:
+
+- Custom graph queries beyond what the built-in tools provide
+- Advanced analysis requiring multiple hops or complex patterns
+- Debugging the knowledge graph schema
+- Extracting data for external tools
+
+## Arguments
+
+<ParamField path="query" type="string" required>
+  Cypher query to execute.
+  
+  Must be a valid KuzuDB Cypher query.
+</ParamField>
+
+## Options
+
+<ParamField path="--repo" type="string" optional>
+  Target repository name. Omit if only one repository is indexed.
+</ParamField>
+
+## Usage Examples
+
+### List all functions
+
+```bash
+gitnexus cypher "MATCH (n:Function) RETURN n.name LIMIT 10"
+```
+
+### Find all callers of a function
+
+```bash
+gitnexus cypher "MATCH (caller)-[:CodeRelation {type: 'CALLS'}]->(f:Function {name: 'validateUser'}) RETURN caller.name, caller.filePath"
+```
+
+### Get class hierarchy
+
+```bash
+gitnexus cypher "MATCH (c:Class)-[:CodeRelation {type: 'EXTENDS'}]->(parent:Class) RETURN c.name, parent.name"
+```
+
+### Count nodes by type
+
+```bash
+gitnexus cypher "MATCH (n) RETURN label(n) AS type, COUNT(*) AS count"
+```
+
+### Find deeply nested call chains
+
+```bash
+gitnexus cypher "MATCH path = (a:Function)-[:CodeRelation*4 {type: 'CALLS'}]->(b:Function) RETURN a.name, b.name, length(path)"
+```
+
+### Specific repository
+
+```bash
+gitnexus cypher "MATCH (n:Function) RETURN n.name LIMIT 10" --repo backend-api
+```
+
+## Output Format
+
+Results are returned as JSON on **stderr**:
+
+```json
+{
+  "results": [
+    {
+      "n.name": "validateUser"
+    },
+    {
+      "n.name": "hashPassword"
+    },
+    {
+      "n.name": "generateToken"
+    }
+  ],
+  "rowCount": 3
+}
+```
+
+## Graph Schema
+
+Before writing Cypher queries, understand the graph schema:
+
+### Node Types
+
+- `File` — Source files
+- `Function` — Top-level functions
+- `Class` — Classes
+- `Interface` — Interfaces
+- `Method` — Class methods
+- `Community` — Functional clusters
+- `Process` — Execution flows
+
+### Relationship Types
+
+All relationships use `CodeRelation` edges with a `type` property:
+
+- `CALLS` — Function/method calls another function/method
+- `IMPORTS` — File imports from another file
+- `EXTENDS` — Class extends another class
+- `IMPLEMENTS` — Class implements an interface
+- `DEFINES` — File defines a symbol
+- `MEMBER_OF` — Symbol belongs to a cluster
+- `STEP_IN_PROCESS` — Symbol participates in an execution flow
+
+### Common Properties
+
+- `name` — Symbol name
+- `filePath` — Absolute path to file
+- `line` — Line number
+- `content` — Source code (optional)
+- `uid` — Unique identifier
+
+## Example Queries
+
+### Find all entry points
+
+```bash
+gitnexus cypher "MATCH (f:Function) WHERE NOT EXISTS { MATCH (f)<-[:CodeRelation {type: 'CALLS'}]-() } RETURN f.name, f.filePath"
+```
+
+### Find circular dependencies
+
+```bash
+gitnexus cypher "MATCH (a:Function)-[:CodeRelation {type: 'CALLS'}]->(b:Function)-[:CodeRelation {type: 'CALLS'}]->(a) RETURN a.name, b.name"
+```
+
+### Get cluster members
+
+```bash
+gitnexus cypher "MATCH (s)-[:CodeRelation {type: 'MEMBER_OF'}]->(c:Community {name: 'auth'}) RETURN s.name, label(s)"
+```
+
+### Find unused functions
+
+```bash
+gitnexus cypher "MATCH (f:Function) WHERE NOT EXISTS { MATCH (f)<-[:CodeRelation {type: 'CALLS'}]-() } AND NOT EXISTS { MATCH (f)-[:CodeRelation {type: 'STEP_IN_PROCESS'}]->() } RETURN f.name, f.filePath"
+```
+
+## When to Use
+
+Use `gitnexus cypher` when:
+
+- Built-in tools don't provide the exact analysis you need
+- You want to experiment with custom graph queries
+- You're building external tools that consume GitNexus data
+- You need to validate or debug the knowledge graph
+
+For common use cases, prefer the specialized tools:
+
+- [`gitnexus query`](/api/commands/query) — Search for execution flows
+- [`gitnexus context`](/api/commands/context) — Symbol context
+- [`gitnexus impact`](/api/commands/impact) — Blast radius
+
+## Cypher Resources
+
+GitNexus uses KuzuDB's Cypher implementation. See:
+
+- [KuzuDB Cypher Documentation](https://docs.kuzudb.com/cypher/)
+- [Cypher Query Language](https://neo4j.com/developer/cypher/)
+
+## Multi-Repo Support
+
+If you have multiple repositories indexed, specify which one:
+
+```bash
+gitnexus cypher "MATCH (n:Function) RETURN n.name LIMIT 10" --repo backend-api
+```
+
+## Output Destination
+
+All output goes to **stderr** instead of stdout because KuzuDB's native module captures stdout at the OS level.
+
+To redirect to a file:
+
+```bash
+gitnexus cypher "MATCH (n) RETURN n LIMIT 10" 2> results.json
+```
+
+## Related Commands
+
+- [`gitnexus query`](/api/commands/query) — Search for execution flows
+- [`gitnexus context`](/api/commands/context) — 360-degree symbol view
+- [`gitnexus impact`](/api/commands/impact) — Blast radius analysis

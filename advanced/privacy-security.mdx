@@ -1,0 +1,332 @@
+---
+title: Privacy & Security
+description: How GitNexus handles your code and data
+---
+
+## Privacy Guarantee
+
+**Your code never leaves your machine.**
+
+GitNexus is designed with privacy as a core principle:
+
+- **No telemetry** - No analytics, tracking, or phone-home
+- **No cloud processing** - All indexing happens locally
+- **No network requests** - Zero external API calls during indexing
+- **No data collection** - We don't see or store any user data
+
+## CLI Privacy Model
+
+### 100% Local Processing
+
+The GitNexus CLI runs entirely on your machine:
+
+1. **Code stays local** - Source files are never uploaded anywhere
+2. **Local database** - Knowledge graph stored in `.gitnexus/` directory
+3. **Local embeddings** - AI models downloaded once, run locally
+4. **No authentication** - No accounts, API keys, or sign-ins required
+
+### What Gets Sent to the Network?
+
+**Short answer: Nothing.**
+
+The only network activity is:
+
+- **Initial package install** - Downloads GitNexus from npm registry (one-time)
+- **Embedding model download** - Downloads `snowflake-arctic-embed-xs` from Hugging Face (one-time, only if `--embeddings` used)
+
+After initial setup, GitNexus operates **completely offline**.
+
+### Storage Locations
+
+**Per-Repository Index:**
+
+```
+my-project/.gitnexus/
+├── graph.kuzu          # Your code graph (stays in your repo)
+├── graph.kuzu.wal      # Database write-ahead log
+├── graph.kuzu.lock     # Database lock file
+└── meta.json           # Index metadata (commit hash, stats)
+```
+
+**Global Registry:**
+
+```
+~/.gitnexus/
+└── registry.json       # List of indexed repos (paths only)
+```
+
+The global registry contains **only file paths and metadata** - no code content.
+
+### Automatic Gitignore
+
+GitNexus **automatically adds** `.gitnexus/` to your `.gitignore`:
+
+```bash
+# Added by gitnexus analyze
+.gitnexus/
+```
+
+This prevents accidentally committing:
+
+- Parsed code content
+- Knowledge graph database
+- Embedding vectors
+
+If your repo is already tracked by git, the index stays local and never gets pushed.
+
+## Web UI Privacy Model
+
+### Browser-Only Processing
+
+The web UI at [gitnexus.vercel.app](https://gitnexus.vercel.app) is **100% client-side**:
+
+- **No server backend** - Static HTML/JS/CSS only
+- **No file upload** - Code is parsed in your browser
+- **No analytics** - No tracking scripts
+- **No cookies** - No session or user tracking
+
+### How It Works
+
+1. **You select files** - Browser file picker (no upload)
+2. **Client-side parsing** - Tree-sitter WASM runs in browser
+3. **IndexedDB storage** - Graph stored in browser's local database
+4. **Local inference** - Embeddings run via WebGPU/WASM
+
+Your code **never touches a server**.
+
+### Local Backend Mode
+
+Run GitNexus locally and connect the web UI:
+
+```bash
+gitnexus serve
+```
+
+This starts a **local HTTP server** (default: `http://localhost:3000`).
+
+**Privacy in Local Mode:**
+
+- Server runs on `localhost` - not exposed to internet
+- No external requests - all data flows CLI ↔ browser
+- Your code stays on your machine
+- Web UI becomes a local UI for your indexed repos
+
+## API Key Security
+
+### Chat Features (Optional)
+
+The web UI supports **optional AI chat** via OpenAI/Anthropic APIs:
+
+- **Your API keys** - You provide your own API keys
+- **Client-side only** - Keys stored in browser `localStorage`
+- **Direct API calls** - Requests go directly from browser to OpenAI/Anthropic
+- **No proxy** - GitNexus servers never see your keys
+
+**Storage:**
+
+```javascript
+localStorage.setItem('openai_api_key', 'sk-...')
+```
+
+**Never stored on disk or transmitted to GitNexus.**
+
+### Clearing API Keys
+
+Remove keys from browser:
+
+```javascript
+// In browser console
+localStorage.removeItem('openai_api_key')
+localStorage.removeItem('anthropic_api_key')
+```
+
+Or clear all site data via browser settings.
+
+## Data Retention
+
+### CLI Data
+
+**Per-Repo Index:**
+
+- Stored in `.gitnexus/` inside your repository
+- Persists until you delete it
+- Removed with `gitnexus clean`
+
+**Global Registry:**
+
+- Stored in `~/.gitnexus/registry.json`
+- Contains only repo paths and metadata
+- Removed with `gitnexus clean --all --force`
+
+**Embedding Models:**
+
+- Cached in `~/.cache/huggingface/` (Linux/Mac) or `%LOCALAPPDATA%\huggingface\` (Windows)
+- Shared across all repos
+- Can be deleted manually if needed
+
+### Web Data
+
+**IndexedDB:**
+
+- Stored in browser's IndexedDB
+- Persists until you clear browser data
+- Can be deleted via browser DevTools → Storage
+
+**localStorage:**
+
+- API keys stored in `localStorage`
+- Cleared when you clear site data
+
+## Security Best Practices
+
+### Don't Commit `.gitnexus/`
+
+✅ **Automatic gitignore** - GitNexus adds `.gitnexus/` to `.gitignore`
+
+❌ **Never manually commit** - The index contains parsed code content
+
+If you accidentally committed `.gitnexus/`:
+
+```bash
+# Remove from git history
+git rm -r --cached .gitnexus/
+git commit -m "Remove .gitnexus from version control"
+```
+
+### Avoid Indexing Secrets
+
+GitNexus parses all code files, which may include:
+
+- `.env` files (if not in `.gitignore`)
+- `config.json` with API keys
+- Hardcoded credentials
+
+Best practices:
+
+- Keep secrets in environment variables
+- Use `.env` and gitignore it
+- Never hardcode credentials in code
+
+**Note:** GitNexus doesn't scan `.env` files by default, but it will parse any code files that import them.
+
+### Multi-User Systems
+
+On shared systems, be aware:
+
+- `.gitnexus/` is readable by all users with repo access
+- Global registry (`~/.gitnexus/`) lists your repo paths
+- File permissions match your repository's permissions
+
+If you need stricter access control:
+
+```bash
+chmod 700 .gitnexus/
+```
+
+## Open Source Transparency
+
+GitNexus is **open source** under the PolyForm Noncommercial license:
+
+- **Source code**: [github.com/abhigyanpatwari/GitNexus](https://github.com/abhigyanpatwari/GitNexus)
+- **Audit the code** - See exactly what GitNexus does
+- **No black boxes** - All algorithms are public
+- **Community review** - Anyone can inspect and verify privacy claims
+
+## Third-Party Dependencies
+
+GitNexus relies on:
+
+### Required Dependencies
+
+- **KuzuDB** - Embedded graph database (no network)
+- **Tree-sitter** - AST parsing library (no network)
+- **Node.js** - Runtime environment
+
+### Optional Dependencies
+
+- **transformers.js** - AI embeddings (downloads model from Hugging Face)
+- **ONNX Runtime** - Model inference (no network after model download)
+
+All dependencies are **well-established open-source projects**.
+
+## Compliance
+
+### GDPR (EU)
+
+- **No personal data collection** - GitNexus doesn't collect user data
+- **Local processing** - Data never leaves your device
+- **No data transfers** - No cross-border data movement
+- **User control** - You own and control all data
+
+### CCPA (California)
+
+- **No sale of data** - We don't collect or sell any data
+- **No data brokers** - No third-party data sharing
+- **No tracking** - No analytics or user profiling
+
+### SOC 2 / Enterprise
+
+For enterprise use:
+
+- All processing is local - no cloud data transfer risks
+- Audit logs are git commits (via `meta.json` commit tracking)
+- Access control via file system permissions
+- No vendor lock-in - data stored in open formats (KuzuDB, JSON)
+
+## Frequently Asked Questions
+
+### Does GitNexus "call home"?
+
+**No.** GitNexus makes zero network requests during indexing or querying.
+
+### Can GitNexus access files outside my repo?
+
+**No.** GitNexus only reads files inside the repository you're indexing.
+
+### What if I use the MCP server with Claude/Cursor?
+
+**Safe.** The MCP server:
+
+- Runs locally on your machine (`stdio` communication)
+- Only sends data you explicitly query for (via MCP tools)
+- Doesn't send code unless you ask it to (e.g., via `context` tool)
+- Editor connections are local (no internet)
+
+Your AI editor may send MCP tool **results** to its cloud API (e.g., Claude, GPT), but GitNexus itself doesn't send anything.
+
+### Is the web UI safe?
+
+**Yes.** The web UI:
+
+- Runs entirely in your browser (no server)
+- Doesn't upload files
+- Stores everything in IndexedDB (local to your browser)
+
+If you use the AI chat feature, your API calls go directly to OpenAI/Anthropic (not through GitNexus).
+
+### Can I use GitNexus for proprietary code?
+
+**Yes.** GitNexus is designed for proprietary codebases:
+
+- No external transmission
+- Local-only processing
+- No licensing restrictions on indexed code
+
+*Note: The GitNexus tool itself is under PolyForm Noncommercial (commercial license available).*
+
+### What happens if GitNexus is compromised?
+
+**Low risk.** Even if GitNexus had a security vulnerability:
+
+- Your code stays on your machine (not uploaded)
+- No remote access or command execution
+- Worst case: corrupted local index (re-run `gitnexus analyze`)
+
+## Reporting Security Issues
+
+Found a security issue?
+
+- **Email**: [Security contact in repo](https://github.com/abhigyanpatwari/GitNexus#readme)
+- **GitHub Issues**: [github.com/abhigyanpatwari/GitNexus/issues](https://github.com/abhigyanpatwari/GitNexus/issues)
+
+We take security seriously and will respond promptly.

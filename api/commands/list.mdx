@@ -1,0 +1,146 @@
+---
+title: gitnexus list
+description: List all indexed repositories
+---
+
+## Syntax
+
+```bash
+gitnexus list
+```
+
+## Description
+
+Shows all indexed repositories from the global registry (`~/.gitnexus/registry.json`).
+
+The command validates each repository entry, checking if:
+
+- The repository path still exists
+- The `.gitnexus/` index directory exists
+- The metadata is readable
+
+Invalid entries are automatically filtered out.
+
+## Output Example
+
+```
+Indexed Repositories (2)
+
+my-app
+  Path:    /Users/dev/projects/my-app
+  Indexed: 2/28/2026, 10:30:00 AM
+  Commit:  a3f9c21
+  Stats:   125 files, 1348 symbols, 3469 edges
+  Clusters:   42
+  Processes:  104
+
+backend-api
+  Path:    /Users/dev/projects/backend-api
+  Indexed: 2/27/2026, 3:45:00 PM
+  Commit:  b8e2d44
+  Stats:   89 files, 892 symbols, 2134 edges
+  Clusters:   28
+  Processes:  67
+```
+
+## When No Repositories Found
+
+```
+No indexed repositories found.
+Run `gitnexus analyze` in a git repo to index it.
+```
+
+## What Gets Listed
+
+- **Repository name** — Derived from the directory name
+- **Path** — Absolute path to the repository
+- **Indexed** — Timestamp of last indexing
+- **Commit** — Git commit SHA (first 7 characters) that was indexed
+- **Stats** — File count, symbol count (nodes), edge count
+- **Clusters** — Number of functional communities detected
+- **Processes** — Number of execution flows traced
+
+## Use Cases
+
+### Check what's indexed
+
+```bash
+gitnexus list
+```
+
+### Before starting MCP server
+
+Verify your repositories are indexed before using MCP tools:
+
+```bash
+gitnexus list
+gitnexus mcp
+```
+
+### Before starting HTTP server
+
+Check which repositories will be served:
+
+```bash
+gitnexus list
+gitnexus serve
+```
+
+## Multi-Repo Workflow
+
+GitNexus supports indexing multiple repositories. Each `gitnexus analyze` registers the repo in the global registry.
+
+Example workflow:
+
+```bash
+# Index multiple repos
+cd ~/projects/frontend
+gitnexus analyze
+
+cd ~/projects/backend
+gitnexus analyze
+
+cd ~/projects/shared-lib
+gitnexus analyze
+
+# List all indexed repos
+gitnexus list
+```
+
+The MCP server and HTTP server both serve all indexed repositories automatically.
+
+## Registry Location
+
+The global registry is stored at:
+
+```
+~/.gitnexus/registry.json
+```
+
+This file contains metadata for all indexed repositories:
+
+```json
+{
+  "repos": [
+    {
+      "path": "/Users/dev/projects/my-app",
+      "name": "my-app",
+      "indexedAt": "2026-02-28T10:30:00.000Z",
+      "lastCommit": "a3f9c2189bd7",
+      "stats": {
+        "files": 125,
+        "nodes": 1348,
+        "edges": 3469,
+        "communities": 42,
+        "processes": 104
+      }
+    }
+  ]
+}
+```
+
+## Related Commands
+
+- [`gitnexus analyze`](/api/commands/analyze) — Index a repository
+- [`gitnexus status`](/api/commands/status) — Check index status for current repo
+- [`gitnexus clean`](/api/commands/clean) — Remove a repository from the registry

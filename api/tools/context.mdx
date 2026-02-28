@@ -1,0 +1,397 @@
+---
+title: context
+description: Get a 360-degree view of a single code symbol with categorized references
+---
+
+## Overview
+
+The `context` tool provides comprehensive information about a specific code symbol, including all incoming and outgoing relationships, process participation, and categorized references. It's the go-to tool for understanding "what does this symbol do and how is it connected to the rest of the codebase?"
+
+<Info>
+  **When to use**: After `query()` to understand a specific symbol in depth. When you need to know all callers, callees, and what execution flows a symbol participates in.
+  
+  **Next step**: Use `impact()` if planning changes, or READ `gitnexus://repo/{name}/process/{processName}` for full execution trace.
+</Info>
+
+## Parameters
+
+<ParamField path="name" type="string">
+  Symbol name to look up (e.g., "validateUser", "AuthService")
+  
+  If multiple symbols share this name, the tool returns disambiguation candidates.
+</ParamField>
+
+<ParamField path="uid" type="string">
+  Direct symbol UID from prior tool results for zero-ambiguity lookup
+  
+  When you have a `uid` from `query()` results, prefer this over `name` to avoid disambiguation.
+</ParamField>
+
+<ParamField path="file_path" type="string">
+  File path to disambiguate common names
+  
+  **Example:** `"src/auth/validator.ts"` when multiple `validate` functions exist
+</ParamField>
+
+<ParamField path="include_content" type="boolean" default={false}>
+  Include full source code for the symbol in results
+  
+  <Warning>Enabling this increases response size.</Warning>
+</ParamField>
+
+<ParamField path="repo" type="string">
+  Repository name or path. Required when multiple repos are indexed.
+</ParamField>
+
+<Note>
+  At least one of `name`, `uid`, or `file_path` must be provided.
+</Note>
+
+## Response
+
+<ResponseField name="symbol" type="object" required>
+  The target symbol's metadata
+  
+  <Expandable title="properties">
+    <ResponseField name="uid" type="string">
+      Unique identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Symbol name
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Symbol type: Function, Class, Method, Interface, etc.
+    </ResponseField>
+    
+    <ResponseField name="filePath" type="string">
+      File location
+    </ResponseField>
+    
+    <ResponseField name="line" type="number">
+      Line number
+    </ResponseField>
+    
+    <ResponseField name="module" type="string">
+      Functional area/community
+    </ResponseField>
+    
+    <ResponseField name="content" type="string">
+      Full source code (when `include_content: true`)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="incoming" type="object" required>
+  Categorized incoming references (what depends on this symbol)
+  
+  <Expandable title="categories">
+    <ResponseField name="calls" type="array">
+      Functions/methods that call this symbol
+    </ResponseField>
+    
+    <ResponseField name="imports" type="array">
+      Files/modules that import this symbol
+    </ResponseField>
+    
+    <ResponseField name="extends" type="array">
+      Classes that extend this class
+    </ResponseField>
+    
+    <ResponseField name="implements" type="array">
+      Classes that implement this interface
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="outgoing" type="object" required>
+  Categorized outgoing references (what this symbol depends on)
+  
+  <Expandable title="categories">
+    <ResponseField name="calls" type="array">
+      Functions/methods this symbol calls
+    </ResponseField>
+    
+    <ResponseField name="imports" type="array">
+      Modules/files this symbol imports from
+    </ResponseField>
+    
+    <ResponseField name="extends" type="array">
+      Classes this class extends
+    </ResponseField>
+    
+    <ResponseField name="implements" type="array">
+      Interfaces this class implements
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="processes" type="array">
+  Execution flows this symbol participates in
+  
+  <Expandable title="process properties">
+    <ResponseField name="name" type="string">
+      Process name
+    </ResponseField>
+    
+    <ResponseField name="step" type="number">
+      Which step in the flow (e.g., 2/5 means step 2 of 5)
+    </ResponseField>
+    
+    <ResponseField name="totalSteps" type="number">
+      Total steps in this process
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="disambiguation" type="array">
+  When multiple symbols match, returns candidates to choose from
+  
+  <Expandable title="candidate properties">
+    <ResponseField name="uid" type="string">
+      Use this for zero-ambiguity lookup
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Symbol name
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Symbol type
+    </ResponseField>
+    
+    <ResponseField name="filePath" type="string">
+      File location
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Usage
+
+### Lookup by Name
+
+```javascript
+context({
+  name: "validateUser"
+})
+```
+
+### Lookup by UID (Zero-Ambiguity)
+
+```javascript
+// Using uid from query() results
+context({
+  uid: "func_validateUser_abc123"
+})
+```
+
+### Disambiguate by File Path
+
+```javascript
+context({
+  name: "validate",
+  file_path: "src/auth/validator.ts"
+})
+```
+
+### With Source Code
+
+```javascript
+context({
+  name: "processPayment",
+  include_content: true
+})
+```
+
+### Multi-Repo Context
+
+```javascript
+context({
+  name: "validateUser",
+  repo: "my-app"
+})
+```
+
+## Example Response
+
+```json
+{
+  "symbol": {
+    "uid": "func_validateUser_abc123",
+    "name": "validateUser",
+    "type": "Function",
+    "filePath": "src/auth/validator.ts",
+    "line": 42,
+    "module": "Authentication"
+  },
+  "incoming": {
+    "calls": [
+      {
+        "name": "loginHandler",
+        "type": "Function",
+        "filePath": "src/auth/login.ts",
+        "line": 18
+      },
+      {
+        "name": "apiMiddleware",
+        "type": "Function",
+        "filePath": "src/api/middleware.ts",
+        "line": 25
+      }
+    ],
+    "imports": [
+      {
+        "name": "authRouter",
+        "filePath": "src/routes/auth.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "name": "checkToken",
+        "type": "Function",
+        "filePath": "src/auth/token.ts",
+        "line": 10
+      },
+      {
+        "name": "getUserById",
+        "type": "Function",
+        "filePath": "src/db/users.ts",
+        "line": 34
+      }
+    ],
+    "imports": [
+      {
+        "module": "jsonwebtoken"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "name": "LoginFlow",
+      "step": 2,
+      "totalSteps": 5
+    },
+    {
+      "name": "TokenRefresh",
+      "step": 1,
+      "totalSteps": 3
+    }
+  ]
+}
+```
+
+## Disambiguation Example
+
+When multiple symbols share the same name:
+
+```json
+{
+  "disambiguation": [
+    {
+      "uid": "func_validate_auth_123",
+      "name": "validate",
+      "type": "Function",
+      "filePath": "src/auth/validator.ts",
+      "line": 10
+    },
+    {
+      "uid": "func_validate_payment_456",
+      "name": "validate",
+      "type": "Function",
+      "filePath": "src/payments/validator.ts",
+      "line": 22
+    }
+  ],
+  "message": "Multiple symbols found. Please refine your query using uid or file_path."
+}
+```
+
+## Real-World Examples
+
+### Example 1: Understanding a Function
+
+```javascript
+// Task: "What does validateUser do and who calls it?"
+context({
+  name: "validateUser"
+})
+
+// Returns:
+// - Incoming calls: loginHandler, apiMiddleware
+// - Outgoing calls: checkToken, getUserById
+// - Processes: LoginFlow (step 2/5), TokenRefresh (step 1/3)
+```
+
+### Example 2: Debugging an Error
+
+```javascript
+// Task: "This function is failing - what does it call?"
+context({
+  name: "validatePayment",
+  include_content: true
+})
+
+// Returns:
+// - Outgoing calls: verifyCard, fetchRates (external API!)
+// - Root cause found: fetchRates has no timeout
+```
+
+### Example 3: Impact Analysis Prep
+
+```javascript
+// Task: "I want to change this - what depends on it?"
+context({
+  name: "processCheckout"
+})
+
+// Returns:
+// - Incoming calls: checkoutHandler, webhookHandler, scheduledProcessor
+// - Affected processes: CheckoutFlow, RefundFlow
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use uid when available">
+    If you have a `uid` from `query()` results, always use it for instant, unambiguous lookup. This avoids disambiguation overhead.
+  </Accordion>
+  
+  <Accordion title="Review categorized references">
+    The categorization (calls, imports, extends, implements) helps you quickly understand different types of relationships without parsing raw data.
+  </Accordion>
+  
+  <Accordion title="Check process participation">
+    The `processes` array shows which execution flows involve this symbol. This is crucial for understanding the symbol's role in the system.
+  </Accordion>
+  
+  <Accordion title="Follow the chain">
+    Use `context()` iteratively: start with one symbol, then call `context()` on its dependencies to trace through the codebase.
+  </Accordion>
+  
+  <Accordion title="Disambiguate proactively">
+    For common names like "validate" or "process", provide `file_path` upfront to avoid disambiguation rounds.
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+- **Understanding symbols**: "What does this function do?"
+- **Finding dependencies**: "What does this call?"
+- **Finding dependents**: "What calls this?"
+- **Debugging**: "Trace this error's call chain"
+- **Refactoring prep**: "What breaks if I change this?"
+- **Process tracing**: "Which flows use this?"
+
+## Related Tools
+
+- [query](/api/tools/query) - Find symbols before getting their context
+- [impact](/api/tools/impact) - Analyze blast radius before changes
+- [cypher](/api/tools/cypher) - Custom relationship queries
+
+## Related Resources
+
+- `gitnexus://repo/{name}/process/{name}` - Full execution trace for processes
+- `gitnexus://repo/{name}/cluster/{name}` - View all symbols in a functional area

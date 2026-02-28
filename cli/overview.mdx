@@ -1,0 +1,142 @@
+---
+title: CLI Overview
+description: Command-line interface for indexing and managing repositories with GitNexus
+---
+
+GitNexus provides a powerful command-line interface for indexing repositories, managing the knowledge graph, and serving data to AI tools.
+
+## Quick Start
+
+```bash
+# Index your repository
+npx gitnexus analyze
+
+# Configure MCP for your editor (one-time)
+npx gitnexus setup
+
+# Start the local server for web UI
+npx gitnexus serve
+```
+
+## Available Commands
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `analyze [path]` | Index a repository into the knowledge graph |
+| `setup` | Configure MCP integration for supported editors |
+| `serve` | Start local HTTP server for web UI connection |
+| `clean` | Delete GitNexus index for current or all repos |
+| `wiki [path]` | Generate LLM-powered documentation from the knowledge graph |
+
+### Repository Management
+
+| Command | Description |
+|---------|-------------|
+| `list` | List all indexed repositories |
+| `status` | Show index status for current repository |
+
+### MCP Server
+
+| Command | Description |
+|---------|-------------|
+| `mcp` | Start MCP server (stdio) — serves all indexed repos |
+
+### Direct Tool Access
+
+These commands bypass MCP overhead and invoke the knowledge graph directly:
+
+| Command | Description |
+|---------|-------------|
+| `query <search>` | Search for execution flows related to a concept |
+| `context [name]` | Get 360-degree view of a code symbol |
+| `impact <target>` | Blast radius analysis for a symbol |
+| `cypher <query>` | Execute raw Cypher queries against the graph |
+
+## Global vs Repository-Specific
+
+### Global Commands
+
+These commands work from any directory:
+
+- `setup` — Configures MCP globally for all projects
+- `list` — Shows all indexed repositories
+- `serve` — Serves all indexed repositories
+- `mcp` — Serves all indexed repositories via MCP
+
+### Repository-Specific Commands
+
+These commands must be run from within a git repository:
+
+- `analyze` — Indexes the current repository
+- `status` — Shows index status for current repository
+- `clean` — Removes index for current repository
+- `wiki` — Generates documentation for current repository
+- `query`, `context`, `impact`, `cypher` — Query the knowledge graph
+
+## Storage Architecture
+
+### Local Repository Storage (`.gitnexus/`)
+
+Each indexed repository gets a `.gitnexus/` directory at its root:
+
+```
+my-repo/
+├── .gitnexus/
+│   ├── db/              # KuzuDB graph database
+│   ├── wiki/            # Generated documentation (if using wiki command)
+│   └── meta.json        # Index metadata (commit hash, stats, timestamp)
+├── AGENTS.md            # Agent context file (auto-generated)
+└── CLAUDE.md            # Claude Code context file (auto-generated)
+```
+
+The `.gitnexus/` directory is automatically added to `.gitignore`.
+
+### Global Registry (`~/.gitnexus/`)
+
+GitNexus maintains a global registry of all indexed repositories:
+
+```
+~/.gitnexus/
+├── registry.json        # Paths to all indexed repositories
+├── config.json          # CLI configuration (LLM API keys, etc.)
+└── skills/              # Global agent skills (if using setup command)
+```
+
+**Purpose:**
+- MCP server discovers and serves all indexed repos automatically
+- Multi-repo workflows without re-indexing
+- Centralized configuration for LLM providers
+
+## Command Options
+
+Most commands support:
+
+- `-h, --help` — Show help for the command
+- `-V, --version` — Show GitNexus version
+
+## Memory Management
+
+GitNexus automatically allocates up to **8GB of heap memory** for large repositories (e.g., Linux kernel). If you need to customize this:
+
+```bash
+NODE_OPTIONS="--max-old-space-size=16384" npx gitnexus analyze
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Index Repository" icon="magnifying-glass" href="/cli/analyze">
+    Learn how to index your first repository
+  </Card>
+  <Card title="Setup Editors" icon="wrench" href="/cli/setup">
+    Configure MCP for your AI editor
+  </Card>
+  <Card title="Generate Wiki" icon="book" href="/cli/wiki">
+    Create LLM-powered documentation
+  </Card>
+  <Card title="Start Server" icon="server" href="/cli/serve">
+    Run the local HTTP server
+  </Card>
+</CardGroup>

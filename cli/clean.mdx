@@ -1,0 +1,218 @@
+---
+title: gitnexus clean
+description: Delete GitNexus indexes and unregister repositories
+---
+
+The `clean` command removes the `.gitnexus/` index directory from a repository and unregisters it from the global registry.
+
+## Usage
+
+```bash
+gitnexus clean [options]
+```
+
+## Options
+
+<ParamField query="force" type="boolean" default="false">
+  Skip confirmation prompt and delete immediately.
+  
+  **Flag:** `-f, --force`
+</ParamField>
+
+<ParamField query="all" type="boolean" default="false">
+  Delete indexes for **all** registered repositories (instead of just the current one).
+  
+  **Flag:** `--all`
+</ParamField>
+
+## Examples
+
+### Clean Current Repository
+
+Run from within a git repository:
+
+```bash
+cd my-project
+gitnexus clean
+```
+
+**Output:**
+
+```
+This will delete the GitNexus index for: my-project
+   Path: /Users/dev/my-project/.gitnexus
+
+Run with --force to confirm deletion.
+```
+
+**Confirm:**
+
+```bash
+gitnexus clean --force
+```
+
+**Output:**
+
+```
+Deleted: /Users/dev/my-project/.gitnexus
+```
+
+### Clean All Repositories
+
+```bash
+gitnexus clean --all
+```
+
+**Output:**
+
+```
+This will delete GitNexus indexes for 3 repo(s):
+  - my-app (/Users/dev/my-app)
+  - backend (/Users/dev/backend)
+  - frontend (/Users/dev/frontend)
+
+Run with --force to confirm deletion.
+```
+
+**Confirm:**
+
+```bash
+gitnexus clean --all --force
+```
+
+**Output:**
+
+```
+Deleted: my-app (/Users/dev/my-app/.gitnexus)
+Deleted: backend (/Users/dev/backend/.gitnexus)
+Deleted: frontend (/Users/dev/frontend/.gitnexus)
+```
+
+## What Gets Deleted
+
+### Repository Index
+
+The entire `.gitnexus/` directory is removed:
+
+```
+.gitnexus/
+├── db/              # KuzuDB graph database
+├── wiki/            # Generated documentation (if exists)
+└── meta.json        # Index metadata
+```
+
+### Global Registry Entry
+
+The repository is removed from `~/.gitnexus/registry.json`.
+
+### What Stays
+
+- Source code (untouched)
+- `.gitignore` entry (harmless if index is deleted)
+- `AGENTS.md` and `CLAUDE.md` files (can be manually deleted)
+- Agent skills in `.claude/skills/` (per-repo, can be manually deleted)
+
+## Use Cases
+
+### Free Disk Space
+
+Indexes can grow to 100-500 MB for large repositories. Use `clean` to reclaim space:
+
+```bash
+gitnexus clean --force
+```
+
+### Re-index After Corruption
+
+If the index is corrupted:
+
+```bash
+gitnexus clean --force
+gitnexus analyze
+```
+
+### Remove All Indexes Before Uninstalling
+
+```bash
+gitnexus clean --all --force
+npm uninstall -g gitnexus
+```
+
+## Safety
+
+### Confirmation Required
+
+By default, `clean` shows what will be deleted and requires `--force` to proceed.
+
+### No Impact on Source Code
+
+Only the `.gitnexus/` directory is deleted. Your source code is **never** touched.
+
+### Re-indexing
+
+You can always re-index after cleaning:
+
+```bash
+gitnexus clean --force
+gitnexus analyze  # Rebuild index
+```
+
+## Troubleshooting
+
+### "No indexed repository found in this directory"
+
+You're not in a repository that has been indexed.
+
+**Solution:**
+
+```bash
+cd /path/to/indexed/repo
+gitnexus clean
+```
+
+Or use `--all` to clean all indexed repos:
+
+```bash
+gitnexus clean --all --force
+```
+
+### Permission Denied
+
+The `.gitnexus/` directory may be locked by another process.
+
+**Solution:**
+
+1. Stop any running `gitnexus serve` or MCP servers
+2. Close your editor
+3. Retry:
+   ```bash
+   gitnexus clean --force
+   ```
+
+### Failed to Delete (Partial Deletion)
+
+If deletion fails partway through:
+
+```bash
+# Manually remove the directory
+rm -rf .gitnexus/
+
+# Unregister from global registry
+gitnexus clean --force  # Will skip deletion, only unregister
+```
+
+## Impact on MCP
+
+After cleaning a repository:
+
+- MCP tools will no longer see it in `list_repos`
+- Queries targeting that repo will fail
+- The web UI will not show it
+
+Re-run `gitnexus analyze` to restore MCP access.
+
+## See Also
+
+- [gitnexus list](/cli/list) — View all indexed repositories
+- [gitnexus analyze](/cli/analyze) — Re-index after cleaning
+- [gitnexus status](/cli/status) — Check index status

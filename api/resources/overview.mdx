@@ -1,0 +1,96 @@
+---
+title: MCP Resources Overview
+description: Lightweight, on-demand data endpoints for AI agents to navigate the knowledge graph
+---
+
+Resources provide structured, low-token snapshots of your codebase. Unlike tools (which perform actions), resources are read-only data endpoints that agents can access to understand the codebase structure.
+
+## Why Resources?
+
+Resources are optimized for AI agent navigation:
+- **Lightweight**: 100-500 tokens per resource
+- **Cacheable**: Agents can reference them repeatedly
+- **Structured**: YAML format for consistent parsing
+- **On-demand**: Only fetched when needed
+
+## Resource Types
+
+### Global Resources
+
+These resources don't require a repository context:
+
+<CardGroup cols={1}>
+  <Card title="gitnexus://repos" icon="database" href="/api/resources/repos">
+    List all indexed repositories with stats. **Read this first** to discover available repos.
+  </Card>
+</CardGroup>
+
+### Repository Resources
+
+These resources are scoped to a specific repository using the pattern `gitnexus://repo/{name}/...`:
+
+<CardGroup cols={2}>
+  <Card title="context" icon="chart-simple" href="/api/resources/context">
+    Codebase stats, staleness check, and available tools
+  </Card>
+  <Card title="clusters" icon="diagram-project" href="/api/resources/clusters">
+    All functional areas (modules) with cohesion scores
+  </Card>
+  <Card title="processes" icon="route" href="/api/resources/processes">
+    All execution flows detected in the codebase
+  </Card>
+</CardGroup>
+
+### Detail Resources
+
+These provide deep-dives into specific clusters or processes:
+
+<CardGroup cols={2}>
+  <Card title="cluster/{name}" icon="magnifying-glass" href="/api/resources/clusters#cluster-detail">
+    Members and details of a specific functional area
+  </Card>
+  <Card title="process/{name}" icon="list-ol" href="/api/resources/processes#process-detail">
+    Step-by-step trace of a specific execution flow
+  </Card>
+</CardGroup>
+
+## Workflow
+
+Typical agent workflow using resources:
+
+1. **Discovery**: Read `gitnexus://repos` to see all indexed repositories
+2. **Overview**: Read `gitnexus://repo/{name}/context` to check stats and staleness
+3. **Navigation**: Read `clusters` or `processes` to find areas of interest
+4. **Deep Dive**: Read specific `cluster/{name}` or `process/{name}` for details
+5. **Action**: Use tools like `query`, `context`, or `impact` for analysis
+
+## Resource URIs
+
+All GitNexus resources use the `gitnexus://` URI scheme:
+
+```
+gitnexus://repos                              # Global
+gitnexus://repo/{name}/context                # Repo-scoped
+gitnexus://repo/{name}/clusters               # Repo-scoped
+gitnexus://repo/{name}/cluster/{clusterName}  # Detail
+gitnexus://repo/{name}/processes              # Repo-scoped
+gitnexus://repo/{name}/process/{processName}  # Detail
+gitnexus://repo/{name}/schema                 # Cypher schema
+```
+
+## MIME Types
+
+All resources return one of two MIME types:
+- `text/yaml` — Structured data (most resources)
+- `text/markdown` — Documentation content
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Repos Resource" icon="database" href="/api/resources/repos">
+    Start here to discover indexed repositories
+  </Card>
+  <Card title="MCP Tools" icon="wrench" href="/api/tools/query">
+    See available tools for analysis and navigation
+  </Card>
+</CardGroup>

@@ -1,0 +1,397 @@
+---
+title: rename
+description: Multi-file coordinated rename using the knowledge graph and text search
+---
+
+## Overview
+
+The `rename` tool performs safe, multi-file coordinated renaming of code symbols by combining knowledge graph relationships (high confidence) with regex text search (lower confidence). It previews changes by default and tags each edit with its confidence level.
+
+<Info>
+  **When to use**: Renaming a function, class, method, or variable across the codebase. Safer than find-and-replace.
+  
+  **Next step**: Run `detect_changes()` to verify no unexpected side effects.
+</Info>
+
+## Parameters
+
+<ParamField path="symbol_name" type="string">
+  Current symbol name to rename (e.g., "validateUser", "AuthService")
+  
+  Required unless `symbol_uid` is provided.
+</ParamField>
+
+<ParamField path="symbol_uid" type="string">
+  Direct symbol UID from prior tool results for zero-ambiguity lookup
+  
+  When available, prefer this over `symbol_name` to avoid disambiguation.
+</ParamField>
+
+<ParamField path="new_name" type="string" required>
+  The new name for the symbol
+  
+  Must be a valid identifier for the symbol's language.
+</ParamField>
+
+<ParamField path="file_path" type="string">
+  File path to disambiguate common names when multiple symbols share the same name
+  
+  **Example:** `"src/auth/validator.ts"`
+</ParamField>
+
+<ParamField path="dry_run" type="boolean" default={true}>
+  Preview edits without modifying files
+  
+  - `true` (default): Show what would be changed
+  - `false`: Apply changes to disk
+  
+  <Warning>Always review the dry run results before setting this to `false`.</Warning>
+</ParamField>
+
+<ParamField path="repo" type="string">
+  Repository name or path. Required when multiple repos are indexed.
+</ParamField>
+
+<Note>
+  At least one of `symbol_name` or `symbol_uid` must be provided.
+</Note>
+
+## Response
+
+<ResponseField name="changes" type="array" required>
+  All proposed edits grouped by file
+  
+  <Expandable title="file change properties">
+    <ResponseField name="file_path" type="string">
+      Path to the file being modified
+    </ResponseField>
+    
+    <ResponseField name="edits" type="array">
+      Individual edits within this file
+      
+      <Expandable title="edit properties">
+        <ResponseField name="line" type="number">
+          Line number of the change
+        </ResponseField>
+        
+        <ResponseField name="old_text" type="string">
+          Original text
+        </ResponseField>
+        
+        <ResponseField name="new_text" type="string">
+          Replacement text
+        </ResponseField>
+        
+        <ResponseField name="confidence" type="string">
+          **"graph"** - Found via knowledge graph (high confidence, safe)
+          
+          **"text_search"** - Found via regex (lower confidence, review carefully)
+        </ResponseField>
+        
+        <ResponseField name="context" type="string">
+          Surrounding code context for review
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="summary" type="object" required>
+  High-level summary of proposed changes
+  
+  <Expandable title="properties">
+    <ResponseField name="totalEdits" type="number">
+      Total number of edits across all files
+    </ResponseField>
+    
+    <ResponseField name="filesAffected" type="number">
+      Number of files that will be modified
+    </ResponseField>
+    
+    <ResponseField name="graphEdits" type="number">
+      High-confidence edits from knowledge graph
+    </ResponseField>
+    
+    <ResponseField name="textSearchEdits" type="number">
+      Lower-confidence edits from regex text search
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="applied" type="boolean" required>
+  Whether changes were applied to disk (true) or just previewed (false)
+</ResponseField>
+
+## Example Usage
+
+### Preview Rename (Default)
+
+```javascript
+rename({
+  symbol_name: "validateUser",
+  new_name: "authenticateUser"
+})
+```
+
+### Apply Rename
+
+```javascript
+rename({
+  symbol_name: "validateUser",
+  new_name: "authenticateUser",
+  dry_run: false
+})
+```
+
+### Rename with UID (Zero-Ambiguity)
+
+```javascript
+rename({
+  symbol_uid: "func_validateUser_abc123",
+  new_name: "authenticateUser",
+  dry_run: false
+})
+```
+
+### Disambiguate by File Path
+
+```javascript
+rename({
+  symbol_name: "validate",
+  file_path: "src/auth/validator.ts",
+  new_name: "validateAuthentication"
+})
+```
+
+### Multi-Repo Rename
+
+```javascript
+rename({
+  symbol_name: "processPayment",
+  new_name: "handlePayment",
+  repo: "my-app",
+  dry_run: false
+})
+```
+
+## Example Response (Dry Run)
+
+```json
+{
+  "changes": [
+    {
+      "file_path": "src/auth/validator.ts",
+      "edits": [
+        {
+          "line": 42,
+          "old_text": "export function validateUser",
+          "new_text": "export function authenticateUser",
+          "confidence": "graph",
+          "context": "export function validateUser(token: string) {\n  return checkToken(token);\n}"
+        }
+      ]
+    },
+    {
+      "file_path": "src/auth/login.ts",
+      "edits": [
+        {
+          "line": 18,
+          "old_text": "const result = validateUser(token);",
+          "new_text": "const result = authenticateUser(token);",
+          "confidence": "graph",
+          "context": "async function loginHandler(req) {\n  const result = validateUser(token);\n  return result;\n}"
+        }
+      ]
+    },
+    {
+      "file_path": "config.json",
+      "edits": [
+        {
+          "line": 7,
+          "old_text": "\"validator\": \"validateUser\"",
+          "new_text": "\"validator\": \"authenticateUser\"",
+          "confidence": "text_search",
+          "context": "{\n  \"auth\": {\n    \"validator\": \"validateUser\"\n  }\n}"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalEdits": 12,
+    "filesAffected": 8,
+    "graphEdits": 10,
+    "textSearchEdits": 2
+  },
+  "applied": false
+}
+```
+
+## Confidence Levels
+
+<AccordionGroup>
+  <Accordion title='"graph" (High Confidence)'>
+    **Source:** Knowledge graph relationships
+    
+    **Safety:** High — these are actual code references tracked by the graph
+    
+    **Examples:**
+    - Function calls
+    - Import statements
+    - Class instantiations
+    - Method invocations
+    
+    **Action:** Generally safe to accept
+  </Accordion>
+  
+  <Accordion title='"text_search" (Lower Confidence)'>
+    **Source:** Regex text search
+    
+    **Safety:** Lower — may include false positives like comments, strings, or unrelated matches
+    
+    **Examples:**
+    - References in config files
+    - String literals
+    - Comments
+    - Dynamic references
+    
+    **Action:** Review carefully, may need manual adjustment
+  </Accordion>
+</AccordionGroup>
+
+## Real-World Examples
+
+### Example 1: Safe Rename Workflow
+
+```javascript
+// Step 1: Preview the rename
+rename({
+  symbol_name: "validateUser",
+  new_name: "authenticateUser",
+  dry_run: true  // default
+})
+
+// Review output:
+// - 10 graph edits (safe): validator.ts, login.ts, middleware.ts...
+// - 2 text_search edits (review): config.json, README.md
+
+// Step 2: Review text_search edits
+// config.json: "validator": "validateUser" → OK, should be renamed
+// README.md: "...validateUser function..." → Documentation, OK
+
+// Step 3: Apply the rename
+rename({
+  symbol_name: "validateUser",
+  new_name: "authenticateUser",
+  dry_run: false
+})
+
+// Step 4: Verify impact
+detect_changes({ scope: "all" })
+// → Affected: LoginFlow, TokenRefresh
+// → Risk: MEDIUM
+```
+
+### Example 2: Class Rename
+
+```javascript
+// Rename a class and all its references
+rename({
+  symbol_name: "UserService",
+  new_name: "UserRepository",
+  dry_run: false
+})
+
+// Updates:
+// - Class definition
+// - All import statements
+// - All instantiations
+// - Type annotations
+```
+
+### Example 3: Method Rename
+
+```javascript
+// Rename a method within a class
+rename({
+  symbol_name: "getData",
+  file_path: "src/services/ApiService.ts",
+  new_name: "fetchData",
+  dry_run: false
+})
+
+// Updates:
+// - Method definition
+// - All method calls on that class
+// - Preserves other getData methods in different classes
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always dry run first">
+    Never skip the preview. Review the changes, especially `text_search` edits, before applying.
+  </Accordion>
+  
+  <Accordion title="Use UIDs when available">
+    If you have a `symbol_uid` from `query()` or `context()` results, use it to avoid ambiguity.
+  </Accordion>
+  
+  <Accordion title="Review text_search edits carefully">
+    Graph edits are safe, but text_search edits may include false positives (comments, strings, unrelated code).
+  </Accordion>
+  
+  <Accordion title="Run detect_changes after">
+    After applying the rename, run `detect_changes()` to verify only expected files were modified.
+  </Accordion>
+  
+  <Accordion title="Use impact() for high-risk renames">
+    Before renaming widely-used symbols, run `impact()` to understand the blast radius.
+  </Accordion>
+  
+  <Accordion title="Commit after rename">
+    Rename operations can touch many files. Commit immediately after a successful rename to isolate it from other changes.
+  </Accordion>
+</AccordionGroup>
+
+## Workflow Checklist
+
+```markdown
+- [ ] Run rename with dry_run: true (preview)
+- [ ] Review graph edits (high confidence)
+- [ ] Carefully review text_search edits (lower confidence)
+- [ ] Apply rename with dry_run: false
+- [ ] Run detect_changes() to verify scope
+- [ ] Run tests for affected processes
+- [ ] Commit the rename as a standalone change
+```
+
+## Use Cases
+
+- **Function renaming**: Better naming for clarity
+- **Class renaming**: Architecture refactoring
+- **Method renaming**: API improvements
+- **Variable renaming**: Code quality improvements
+- **Refactoring prep**: Rename before extracting modules
+
+## Limitations
+
+<Warning>
+  **String Literals and Dynamic References**
+  
+  The `rename` tool cannot detect:
+  - Dynamic property access: `obj["validateUser"]()`
+  - String literals in external configs
+  - References in non-indexed files
+  
+  **Solution:** Use `text_search` results and manual review to catch these cases.
+</Warning>
+
+## Related Tools
+
+- [impact](/api/tools/impact) - Analyze blast radius before renaming
+- [detect_changes](/api/tools/detect-changes) - Verify rename scope after applying
+- [context](/api/tools/context) - Understand symbol usage before renaming
+
+## Related Resources
+
+- `gitnexus://repo/{name}/processes` - See which flows use the symbol

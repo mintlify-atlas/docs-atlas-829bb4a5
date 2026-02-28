@@ -1,0 +1,102 @@
+---
+title: Web UI Overview
+description: A fully client-side graph explorer and AI chat interface that runs entirely in your browser
+---
+
+The GitNexus Web UI is a browser-based graph explorer and AI chat interface that requires no installation. Everything runs in your browser using WebAssembly — your code never leaves the client.
+
+## Architecture
+
+The Web UI uses the same indexing pipeline as the CLI but runs entirely in WebAssembly:
+
+- **Tree-sitter WASM** for code parsing
+- **KuzuDB WASM** for in-memory graph database
+- **transformers.js** for in-browser embeddings (WebGPU/WASM)
+- **Sigma.js + Graphology** for WebGL graph rendering
+- **LangChain ReAct agent** for AI chat
+
+No server-side processing — all computation happens in your browser.
+
+<Info>
+  **Try it now:** [gitnexus.vercel.app](https://gitnexus.vercel.app)
+</Info>
+
+## CLI vs Web UI Comparison
+
+Choose the right mode for your use case:
+
+| | **CLI + MCP** | **Web UI** |
+|------------------|--------------------------------------------------------------|--------------------------------------------------------------|
+| **What** | Index repos locally, connect AI agents via MCP | Visual graph explorer + AI chat in browser |
+| **For** | Daily development with Cursor, Claude Code, Windsurf, OpenCode | Quick exploration, demos, one-off analysis |
+| **Scale** | Full repos, any size | Limited by browser memory (~5k files), or unlimited via backend mode |
+| **Install** | `npm install -g gitnexus` | No install — [gitnexus.vercel.app](https://gitnexus.vercel.app) |
+| **Storage** | KuzuDB native (fast, persistent) | KuzuDB WASM (in-memory, per session) |
+| **Parsing** | Tree-sitter native bindings | Tree-sitter WASM |
+| **Privacy** | Everything local, no network | Everything in-browser, no server |
+
+## Memory Limitations
+
+The Web UI runs entirely in browser memory with the following constraints:
+
+<Warning>
+  **Browser memory limit:** The WASM environment is limited by available browser memory. For most browsers, this translates to approximately **5,000 files** or ~50MB of source code.
+</Warning>
+
+For larger repositories:
+- Use the [CLI + MCP](/cli/overview) for full-scale indexing
+- Use [local backend mode](/web/local-backend) to connect the web UI to your CLI-indexed repos
+
+## Privacy & Security
+
+<Check>
+  **100% client-side:** All code processing happens in your browser. No uploads, no server-side processing.
+</Check>
+
+- **No network calls** during indexing
+- **No code sent to servers** — files stay in browser memory
+- **API keys stored in localStorage** — never transmitted except to your chosen LLM provider
+- **Open source** — audit the code yourself at [github.com/abhigyanpatwari/gitnexus](https://github.com/abhigyanpatwari/gitnexus)
+
+The only network calls are:
+- Optional LLM API requests when using AI chat (to your configured provider)
+- Optional local backend connections when using bridge mode
+
+## Features
+
+### Graph Visualization
+
+- **WebGL-accelerated rendering** with Sigma.js
+- **Interactive exploration** — click nodes to see details, zoom and pan
+- **Community detection** — functional areas highlighted with colors
+- **Process flows** — trace execution paths through the codebase
+
+### AI Chat
+
+- **LangChain ReAct agent** with graph-aware tools
+- **Cypher query execution** — direct graph queries
+- **Semantic search** — hybrid BM25 + vector search
+- **Code navigation** — browse files and symbols
+
+### Search
+
+- **Hybrid search** — BM25 + semantic (when embeddings are ready)
+- **FTS fallback** — works immediately without embeddings
+- **Process-grouped results** — findings organized by execution flows
+
+## When to Use Web UI
+
+**Best for:**
+- Quick repository exploration
+- Sharing codebase insights with non-developers
+- Demos and presentations
+- One-off analysis of small codebases
+- When you can't install CLI tools
+
+**Not ideal for:**
+- Large repositories (>5k files)
+- Daily development workflow
+- Production AI agent integration
+- Persistent indexing across sessions
+
+For production use cases, see the [CLI documentation](/cli/overview).

@@ -1,0 +1,161 @@
+---
+title: gitnexus query
+description: Search the knowledge graph for execution flows
+---
+
+## Syntax
+
+```bash
+gitnexus query <search_query>
+```
+
+## Description
+
+Searches the knowledge graph for execution flows related to a concept. This is a direct CLI wrapper for the [`query`](/api/tools/query) MCP tool, bypassing MCP overhead for use in scripts, CI, and evaluation.
+
+Results are grouped by execution flows (processes), showing how the matched symbols participate in call chains.
+
+## Arguments
+
+<ParamField path="search_query" type="string" required>
+  The concept to search for (e.g., "authentication flow", "database connection", "error handling").
+</ParamField>
+
+## Options
+
+<ParamField path="--repo" type="string" optional>
+  Target repository name. Omit if only one repository is indexed.
+  
+  Example: `--repo my-app`
+</ParamField>
+
+<ParamField path="--context" type="string" optional>
+  Task context to improve ranking (e.g., "debugging login failures").
+</ParamField>
+
+<ParamField path="--goal" type="string" optional>
+  What you want to find (e.g., "find where auth tokens are validated").
+</ParamField>
+
+<ParamField path="--limit" type="number" optional>
+  Maximum number of processes to return.
+  
+  **Default**: `5`
+</ParamField>
+
+<ParamField path="--content" type="boolean" optional>
+  Include full symbol source code in results.
+  
+  **Default**: `false`
+</ParamField>
+
+## Usage Examples
+
+### Basic search
+
+```bash
+gitnexus query "authentication flow"
+```
+
+### Search with context
+
+```bash
+gitnexus query "database connection" --context "debugging connection pool leaks"
+```
+
+### Search with goal
+
+```bash
+gitnexus query "error handling" --goal "find where exceptions are caught and logged"
+```
+
+### Search specific repository
+
+```bash
+gitnexus query "payment processing" --repo backend-api
+```
+
+### Include source code
+
+```bash
+gitnexus query "JWT validation" --content
+```
+
+### Limit results
+
+```bash
+gitnexus query "API routes" --limit 10
+```
+
+## Output Format
+
+Results are returned as JSON on **stderr** (because KuzuDB captures stdout at the OS level):
+
+```json
+{
+  "processes": [
+    {
+      "name": "user_authentication_flow",
+      "entry_point": "login",
+      "steps": [
+        {
+          "symbol": "validateCredentials",
+          "file": "src/auth/validator.ts",
+          "line": 42,
+          "type": "Function"
+        },
+        {
+          "symbol": "generateToken",
+          "file": "src/auth/token.ts",
+          "line": 18,
+          "type": "Function"
+        }
+      ],
+      "relevance_score": 0.92
+    }
+  ],
+  "total_results": 3
+}
+```
+
+## When to Use
+
+Use `gitnexus query` instead of the MCP tool when:
+
+- Writing shell scripts
+- Running in CI/CD pipelines
+- Performing batch analysis
+- Evaluating GitNexus (e.g., SWE-bench)
+- You need machine-readable output
+
+For interactive use in AI editors, the MCP tool is preferred (better integration with agent workflows).
+
+## Multi-Repo Support
+
+If you have multiple repositories indexed, specify which one to query:
+
+```bash
+gitnexus query "auth" --repo my-app
+```
+
+If you omit `--repo` with multiple repos indexed, you'll get an error:
+
+```
+Error: Multiple repos indexed. Specify --repo <name>
+```
+
+## Output Destination
+
+All output goes to **stderr** instead of stdout because KuzuDB's native module captures stdout at the OS level during initialization.
+
+To redirect to a file:
+
+```bash
+gitnexus query "auth" 2> results.json
+```
+
+## Related Commands
+
+- [`gitnexus context`](/api/commands/context) — 360-degree symbol view
+- [`gitnexus impact`](/api/commands/impact) — Blast radius analysis
+- [`gitnexus cypher`](/api/commands/cypher) — Raw graph queries

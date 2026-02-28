@@ -1,0 +1,341 @@
+---
+title: Hybrid Search
+description: BM25 keyword search combined with semantic embeddings using Reciprocal Rank Fusion
+---
+
+GitNexus uses **hybrid search** to find relevant code: it combines **BM25** (keyword matching) and **semantic search** (embedding similarity), then merges results using **Reciprocal Rank Fusion (RRF)**.
+
+This is the same approach used by production search systems like Elasticsearch, Pinecone, and Weaviate.
+
+## Why Hybrid Search?
+
+Neither keyword search nor semantic search is perfect alone:
+
+| Method | Strengths | Weaknesses |
+|--------|-----------|------------|
+| **BM25** | Fast, exact matches, works for rare terms | Misses synonyms, semantic similarity |
+| **Semantic** | Understands meaning, finds related concepts | Slower, may miss exact matches |
+| **Hybrid** | Best of both — fast keyword + semantic understanding | ✅ |
+
+<Info>
+**Example:** Searching for "authentication middleware" should find both:
+- Files containing "auth" (keyword match)
+- Files with similar concepts like "validateUser", "checkToken" (semantic match)
+</Info>
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Query[User Query: "authentication"] --> BM25[BM25 Search]
+    Query --> Semantic[Semantic Search]
+    BM25 --> KuzuFTS[KuzuDB FTS Index]
+    Semantic --> Embeddings[Vector Index]
+    KuzuFTS --> Results1[Ranked Results 1]
+    Embeddings --> Results2[Ranked Results 2]
+    Results1 --> RRF[Reciprocal Rank Fusion]
+    Results2 --> RRF
+    RRF --> Final[Final Merged Results]
+
+    style Final fill:#22c55e
+```
+
+## BM25 Search
+
+**BM25** (Best Match 25) is a probabilistic ranking algorithm for keyword-based search.
+
+### Implementation
+
+GitNexus uses **KuzuDB's built-in FTS (Full-Text Search)** indexes:
+
+```typescript title="bm25-index.ts:60"
+export const searchFTSFromKuzu = async (query: string, limit: number) => {
+  // Query multiple node types in parallel
+  const fileResults = await queryFTS('File', 'file_fts', query, limit);
+  const functionResults = await queryFTS('Function', 'function_fts', query, limit);
+  const classResults = await queryFTS('Class', 'class_fts', query, limit);
+  const methodResults = await queryFTS('Method', 'method_fts', query, limit);
+  const interfaceResults = await queryFTS('Interface', 'interface_fts', query, limit);
+
+  // Merge by filePath, summing scores
+  const merged = mergeByFilePath([...fileResults, ...functionResults, ...classResults, ...methodResults, ...interfaceResults]);
+  return sorted;
+};
+```
+
+**FTS indexes** are created automatically during graph ingestion:
+
+```cypher
+CREATE FTS INDEX file_fts ON File(filePath)
+CREATE FTS INDEX function_fts ON Function(name)
+CREATE FTS INDEX class_fts ON Class(name)
+```
+
+<Note>
+**Always fresh:** KuzuDB FTS reads from the database on every query — no stale cached indexes.
+</Note>
+
+### BM25 Scoring
+
+BM25 ranks documents using term frequency (TF) and inverse document frequency (IDF):
+
+- **High scores:** Documents with rare query terms that appear frequently
+- **Low scores:** Documents with common terms that appear rarely
+
+KuzuDB handles BM25 scoring internally. GitNexus sums scores across node types when the same file is found multiple times.
+
+## Semantic Search
+
+**Semantic search** uses embedding vectors to find code with similar meaning, even if keywords don't match exactly.
+
+### Embedding Model
+
+GitNexus uses **snowflake-arctic-embed-xs** by default:
+
+- **22M parameters**
+- **384 dimensions**
+- **~90MB model size**
+- **GPU acceleration** via DirectML (Windows) or CUDA (Linux)
+
+```typescript title="embedder.ts:113"
+const embedder = await pipeline('feature-extraction', modelId, {
+  device: 'cuda',  // or 'dml' on Windows, 'cpu' as fallback
+  dtype: 'fp32',
+});
+```
+
+<Accordion title="How embeddings work">
+  Each symbol (function, class, method) is converted to a 384-dimensional vector:
+
+  ```typescript
+  const text = `${symbol.label}: ${symbol.name} in ${symbol.filePath}`;
+  const embedding = await embedText(text);
+  // embedding: Float32Array[384]
+  ```
+
+  Similar code produces similar vectors (measured by cosine similarity).
+</Accordion>
+
+### Vector Index
+
+Embeddings are stored in KuzuDB as vector properties:
+
+```cypher
+ALTER TABLE Function ADD embedding FLOAT[384];
+CREATE INDEX function_embedding_idx ON Function(embedding);
+```
+
+Semantic search uses **cosine similarity** to find nearest neighbors:
+
+```cypher
+MATCH (n:Function)
+WHERE n.embedding IS NOT NULL
+WITH n, array_cosine_similarity(n.embedding, $queryEmbedding) AS similarity
+WHERE similarity > 0.3
+RETURN n.name, n.filePath, similarity
+ORDER BY similarity DESC
+LIMIT 10
+```
+
+<Info>
+**Embedding generation is optional:** Run `gitnexus analyze --skip-embeddings` to index without embeddings (faster, BM25-only search).
+</Info>
+
+## Reciprocal Rank Fusion (RRF)
+
+**RRF** merges rankings from multiple sources without needing to normalize scores.
+
+### Algorithm
+
+For each result at rank `r` in a result set, compute:
+
+```
+RRF_score = 1 / (k + r)
+```
+
+Where `k = 60` (standard constant). If a document appears in both BM25 and semantic results, sum its RRF scores.
+
+```typescript title="hybrid-search.ts:46"
+const RRF_K = 60;
+
+export const mergeWithRRF = (bm25Results, semanticResults, limit) => {
+  const merged = new Map();
+
+  // Add BM25 scores
+  for (let i = 0; i < bm25Results.length; i++) {
+    const rrfScore = 1 / (RRF_K + i + 1);
+    merged.set(bm25Results[i].filePath, {
+      filePath: bm25Results[i].filePath,
+      score: rrfScore,
+      sources: ['bm25'],
+      bm25Score: bm25Results[i].score,
+    });
+  }
+
+  // Add semantic scores (or merge if already present)
+  for (let i = 0; i < semanticResults.length; i++) {
+    const rrfScore = 1 / (RRF_K + i + 1);
+    const existing = merged.get(semanticResults[i].filePath);
+    if (existing) {
+      existing.score += rrfScore;  // Found by both methods
+      existing.sources.push('semantic');
+    } else {
+      merged.set(semanticResults[i].filePath, {
+        filePath: semanticResults[i].filePath,
+        score: rrfScore,
+        sources: ['semantic'],
+      });
+    }
+  }
+
+  // Sort by combined score
+  return Array.from(merged.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+};
+```
+
+### Why RRF?
+
+<AccordionGroup>
+  <Accordion title="No score normalization needed">
+    BM25 scores (0-∞) and cosine similarity (0-1) are on different scales. RRF uses rank position instead of raw scores, avoiding normalization issues.
+  </Accordion>
+
+  <Accordion title="Robust to outliers">
+    A single high BM25 score won't dominate the results. Rank position is more stable.
+  </Accordion>
+
+  <Accordion title="Simple and effective">
+    RRF is a one-line formula with a single parameter (`k = 60`). It's used in production by Elasticsearch, Pinecone, and others.
+  </Accordion>
+</AccordionGroup>
+
+## Process-Grouped Search
+
+GitNexus doesn't just return a flat list of files. Results are **grouped by process** (execution flow) to provide architectural context.
+
+### Example Output
+
+```yaml
+query: "authentication middleware"
+
+processes:
+  - summary: "HandleLogin → ValidateUser → CreateSession"
+    priority: 0.042
+    symbol_count: 4
+    process_type: cross_community
+    step_count: 7
+
+process_symbols:
+  - name: validateUser
+    type: Function
+    filePath: src/auth/validate.ts
+    process_id: proc_login
+    step_index: 2
+    relevance: 0.85
+
+definitions:
+  - name: AuthConfig
+    type: Interface
+    filePath: src/types/auth.ts
+    relevance: 0.72
+```
+
+### Grouping Logic
+
+1. **Run hybrid search** to get relevant symbols
+2. **Find processes** that contain those symbols (via `STEP_IN_PROCESS` edges)
+3. **Rank processes** by relevance:
+   - Sum of RRF scores for symbols in the process
+   - Normalized by process step count
+4. **Group results** by process
+
+<Info>
+Process-grouped search helps agents understand **how** features work, not just **where** they're defined.
+</Info>
+
+## MCP Query Tool
+
+The MCP `query` tool uses hybrid search under the hood:
+
+```typescript
+query({query: "authentication middleware", limit: 10})
+```
+
+**Parameters:**
+- `query` (required) - Search query string
+- `limit` (optional) - Max results (default: 10)
+- `repo` (optional) - Repository name (required if multiple repos indexed)
+
+**Returns:**
+- `processes` - Execution flows related to the query
+- `process_symbols` - Symbols grouped by process
+- `definitions` - Other relevant symbols not in processes
+
+## Performance
+
+| Method | Latency | Memory |
+|--------|---------|--------|
+| BM25 only | ~10ms | Minimal |
+| Semantic only | ~50ms | ~200MB (model loaded) |
+| Hybrid (RRF) | ~60ms | ~200MB |
+
+<Note>
+**GPU acceleration:** Semantic search is 5-10x faster on GPU (DirectML/CUDA) compared to CPU.
+</Note>
+
+## Example: Searching for "auth"
+
+### BM25 Results
+
+```
+1. src/auth/index.ts (score: 15.2)
+2. src/auth/validate.ts (score: 12.8)
+3. src/middleware/auth.ts (score: 10.1)
+```
+
+### Semantic Results
+
+```
+1. src/middleware/validate.ts (similarity: 0.89)
+2. src/auth/index.ts (similarity: 0.85)
+3. src/services/session.ts (similarity: 0.78)
+```
+
+### RRF Merged Results
+
+```
+1. src/auth/index.ts (RRF: 0.0313) — found by both methods ✅
+2. src/auth/validate.ts (RRF: 0.0164) — BM25
+3. src/middleware/validate.ts (RRF: 0.0164) — semantic
+4. src/middleware/auth.ts (RRF: 0.0159) — BM25
+5. src/services/session.ts (RRF: 0.0156) — semantic
+```
+
+<Check>
+`src/auth/index.ts` gets the highest score because it appears in **both** result sets, showing it's highly relevant by both keyword and semantic criteria.
+</Check>
+
+## Customization
+
+You can customize the embedding model during indexing:
+
+```bash
+# Use a different model
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5 gitnexus analyze
+
+# Skip embeddings entirely (BM25 only)
+gitnexus analyze --skip-embeddings
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Knowledge Graph" href="/concepts/knowledge-graph" icon="diagram-project">
+    Understand the graph schema
+  </Card>
+  <Card title="Processes & Flows" href="/concepts/processes-and-flows" icon="diagram-next">
+    Learn how process-grouped search works
+  </Card>
+</CardGroup>

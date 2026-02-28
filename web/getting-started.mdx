@@ -1,0 +1,242 @@
+---
+title: Getting Started with Web UI
+description: Start exploring codebases in seconds with the browser-based interface
+---
+
+The GitNexus Web UI requires no installation. Open your browser and start exploring.
+
+## Quick Start
+
+<Steps>
+  <Step title="Open the Web UI">
+    Navigate to [gitnexus.vercel.app](https://gitnexus.vercel.app) in your browser.
+  </Step>
+  
+  <Step title="Load a Repository">
+    Choose one of three methods:
+    - **Upload ZIP** — drag and drop a `.zip` of your codebase
+    - **Clone from GitHub** — enter a GitHub repository URL
+    - **Connect to local backend** — use `gitnexus serve` for CLI-indexed repos
+  </Step>
+  
+  <Step title="Wait for Indexing">
+    The pipeline will:
+    1. Extract/clone files
+    2. Parse code with Tree-sitter WASM
+    3. Build knowledge graph in KuzuDB WASM
+    4. Detect communities and processes
+    5. Generate embeddings (optional, runs in background)
+  </Step>
+  
+  <Step title="Explore the Graph">
+    Once loaded, you'll see:
+    - **Interactive graph visualization** — zoom, pan, click nodes
+    - **File tree** — browse repository structure
+    - **Search bar** — find code across the repo
+    - **AI chat** — ask questions about the codebase (requires API key)
+  </Step>
+</Steps>
+
+## Loading Methods
+
+### Upload ZIP File
+
+1. **Prepare your codebase:**
+   ```bash
+   # Create a ZIP of your repository (exclude node_modules, .git, etc.)
+   zip -r my-project.zip my-project/ -x "*/node_modules/*" "*/.git/*" "*/dist/*"
+   ```
+
+2. **Drag and drop** the ZIP onto the Web UI
+3. Wait for extraction and indexing (~30 seconds for 500 files)
+
+<Note>
+  The ZIP file is processed entirely in your browser. Nothing is uploaded to a server.
+</Note>
+
+### Clone from GitHub
+
+1. Click **"Clone from GitHub"** on the landing page
+2. Enter a repository URL: `https://github.com/owner/repo`
+3. The Web UI will:
+   - Download the repo as a ZIP from GitHub's API
+   - Extract and index in-browser
+
+<Warning>
+  **Rate limits:** GitHub's ZIP download API is rate-limited for unauthenticated requests. For private repos or large codebases, download manually and upload the ZIP.
+</Warning>
+
+### Connect to Local Backend
+
+See [Local Backend Mode](/web/local-backend) for connecting to CLI-indexed repositories.
+
+## Graph Explorer Interface
+
+### Main Canvas
+
+The **graph visualization** shows your codebase as an interactive force-directed graph:
+
+- **Nodes** represent files, functions, classes, methods, and communities
+- **Edges** represent relationships (calls, imports, extends, implements)
+- **Colors** indicate community membership (functional areas)
+
+**Interactions:**
+- **Click** a node to see details and references
+- **Drag** to rearrange layout
+- **Scroll** to zoom in/out
+- **Pan** by dragging the background
+
+### File Tree Panel
+
+The **left sidebar** shows the repository folder structure:
+
+- Browse files and folders
+- Click any file to see its symbols in the graph
+- Search files by name
+
+### Code References Panel
+
+When you **click a node**, the **code references panel** appears:
+
+- **Symbol details** — name, type, file path, line numbers
+- **Incoming references** — what calls/imports this symbol
+- **Outgoing references** — what this symbol calls/imports
+- **Process participation** — execution flows this symbol is part of
+- **Jump to definition** — view source code
+
+### Processes Panel
+
+The **processes panel** (top toolbar) shows detected execution flows:
+
+- Click any process to see its step-by-step trace
+- Visualize call chains from entry points to terminal nodes
+- Understand cross-module flows
+
+## AI Chat Features
+
+<Info>
+  **API key required:** Configure your LLM provider in Settings (gear icon) before using chat.
+</Info>
+
+The AI chat uses a **LangChain ReAct agent** with graph-aware tools:
+
+### Available Tools
+
+1. **`query_code`** — Semantic search across the codebase
+   ```
+   "Find authentication middleware"
+   ```
+
+2. **`run_cypher`** — Execute graph queries
+   ```
+   "Show me all functions that call validateUser"
+   ```
+
+3. **`read_file`** — View file contents
+   ```
+   "Show me src/auth/validate.ts"
+   ```
+
+4. **`get_symbol_references`** — Get incoming/outgoing refs
+   ```
+   "What depends on the UserService class?"
+   ```
+
+5. **`list_processes`** — List execution flows
+   ```
+   "What are the main execution flows in this codebase?"
+   ```
+
+### Example Queries
+
+<CodeGroup>
+```text Architecture
+"What is the high-level architecture of this codebase?"
+```
+
+```text Dependencies
+"What are all the functions that depend on validateUser?"
+```
+
+```text Debugging
+"Trace the execution flow from handleLogin to createSession"
+```
+
+```text Search
+"Find all database query functions"
+```
+</CodeGroup>
+
+## Configuring LLM Provider
+
+<Steps>
+  <Step title="Open Settings">
+    Click the **gear icon** in the header
+  </Step>
+  
+  <Step title="Choose Provider">
+    Select from:
+    - **OpenAI** (GPT-4, GPT-3.5)
+    - **Anthropic** (Claude)
+    - **Custom** (OpenAI-compatible API)
+  </Step>
+  
+  <Step title="Enter API Key">
+    Paste your API key. It's stored in browser localStorage only.
+  </Step>
+  
+  <Step title="Save">
+    Click **Save Settings**. The agent will initialize.
+  </Step>
+</Steps>
+
+<Warning>
+  **API keys are stored locally** in your browser's localStorage. They are never sent to GitNexus servers (there are none). Keys are only transmitted to your chosen LLM provider's API.
+</Warning>
+
+## Search
+
+Use the **search bar** in the header to find code:
+
+1. **Text search** — works immediately (BM25 full-text search)
+2. **Semantic search** — available after embeddings finish (shown in status bar)
+
+**Hybrid mode** (when embeddings are ready):
+- Combines BM25 and vector similarity
+- Uses Reciprocal Rank Fusion (RRF) for ranking
+- Groups results by execution flows and communities
+
+## Embedding Status
+
+The **status bar** (bottom) shows embedding progress:
+
+- **"Generating embeddings..."** — transformers.js is running in the background
+- **"Embeddings ready"** — semantic search is now available
+- **"WebGPU accelerated"** — using your GPU for faster embeddings
+- **"WASM fallback"** — CPU-only mode (slower)
+
+Embeddings are **optional** — all features work without them, but semantic search quality improves when they're ready.
+
+## Running Locally
+
+You can also run the Web UI from source:
+
+```bash
+git clone https://github.com/abhigyanpatwari/gitnexus.git
+cd gitnexus/gitnexus-web
+npm install
+npm run dev
+```
+
+The dev server will start at `http://localhost:5173`.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Local Backend Mode" icon="link" href="/web/local-backend">
+    Connect to CLI-indexed repos for unlimited scale
+  </Card>
+  <Card title="CLI Overview" icon="terminal" href="/cli/overview">
+    Install the CLI for persistent indexing and MCP
+  </Card>
+</CardGroup>

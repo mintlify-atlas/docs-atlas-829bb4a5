@@ -1,0 +1,176 @@
+---
+title: gitnexus context
+description: 360-degree view of a code symbol
+---
+
+## Syntax
+
+```bash
+gitnexus context [name]
+```
+
+## Description
+
+Provides a 360-degree view of a code symbol: callers, callees, processes it participates in, and more. This is a direct CLI wrapper for the [`context`](/api/tools/context) MCP tool.
+
+Use this to understand:
+
+- Who calls this symbol
+- What this symbol calls
+- Which execution flows use this symbol
+- Where this symbol is defined
+- Related symbols in the same cluster
+
+## Arguments
+
+<ParamField path="name" type="string" optional>
+  Symbol name to look up (e.g., "validateUser", "AuthService").
+  
+  Omit if using `--uid` for direct lookup.
+</ParamField>
+
+## Options
+
+<ParamField path="--repo" type="string" optional>
+  Target repository name. Omit if only one repository is indexed.
+</ParamField>
+
+<ParamField path="--uid" type="string" optional>
+  Direct symbol UID for zero-ambiguity lookup.
+  
+  Example: `--uid "file:src/auth.ts:function:validateUser"`
+</ParamField>
+
+<ParamField path="--file" type="string" optional>
+  File path to disambiguate common symbol names.
+  
+  Example: `--file src/auth/validator.ts`
+</ParamField>
+
+<ParamField path="--content" type="boolean" optional>
+  Include full symbol source code in results.
+  
+  **Default**: `false`
+</ParamField>
+
+## Usage Examples
+
+### Look up symbol by name
+
+```bash
+gitnexus context validateUser
+```
+
+### Disambiguate with file path
+
+```bash
+gitnexus context Logger --file src/utils/logger.ts
+```
+
+### Direct UID lookup
+
+```bash
+gitnexus context --uid "file:src/auth.ts:function:validateUser"
+```
+
+### Include source code
+
+```bash
+gitnexus context validateUser --content
+```
+
+### Specific repository
+
+```bash
+gitnexus context AuthService --repo backend-api
+```
+
+## Output Format
+
+Results are returned as JSON on **stderr**:
+
+```json
+{
+  "symbol": {
+    "name": "validateUser",
+    "type": "Function",
+    "file": "src/auth/validator.ts",
+    "line": 42,
+    "uid": "file:src/auth/validator.ts:function:validateUser"
+  },
+  "callers": [
+    {
+      "name": "login",
+      "file": "src/auth/login.ts",
+      "line": 18,
+      "type": "Function"
+    }
+  ],
+  "callees": [
+    {
+      "name": "hashPassword",
+      "file": "src/auth/crypto.ts",
+      "line": 12,
+      "type": "Function"
+    }
+  ],
+  "processes": [
+    {
+      "name": "user_authentication_flow",
+      "entry_point": "login"
+    }
+  ],
+  "cluster": "auth",
+  "content": "export function validateUser(username: string, password: string) { ... }"
+}
+```
+
+## When to Use
+
+Use `gitnexus context` instead of the MCP tool when:
+
+- Writing shell scripts
+- Running in CI/CD pipelines
+- Performing batch analysis
+- You need machine-readable output
+- Debugging from the terminal
+
+For interactive use in AI editors, the MCP tool is preferred.
+
+## Symbol Disambiguation
+
+When multiple symbols share the same name (e.g., multiple `Logger` classes), use `--file` to disambiguate:
+
+```bash
+gitnexus context Logger --file src/utils/logger.ts
+```
+
+Or use `--uid` for zero-ambiguity lookup:
+
+```bash
+gitnexus context --uid "file:src/utils/logger.ts:class:Logger"
+```
+
+## Multi-Repo Support
+
+If you have multiple repositories indexed, specify which one:
+
+```bash
+gitnexus context AuthService --repo backend-api
+```
+
+## Output Destination
+
+All output goes to **stderr** instead of stdout because KuzuDB's native module captures stdout at the OS level.
+
+To redirect to a file:
+
+```bash
+gitnexus context validateUser 2> context.json
+```
+
+## Related Commands
+
+- [`gitnexus query`](/api/commands/query) — Search for execution flows
+- [`gitnexus impact`](/api/commands/impact) — Blast radius analysis
+- [`gitnexus cypher`](/api/commands/cypher) — Raw graph queries

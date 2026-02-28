@@ -1,0 +1,158 @@
+---
+title: gitnexus setup
+description: One-time MCP configuration for AI editors
+---
+
+## Syntax
+
+```bash
+gitnexus setup
+```
+
+## Description
+
+One-time global MCP configuration writer. Detects installed AI editors and writes the appropriate MCP config so the GitNexus MCP server is available in all projects.
+
+This command auto-detects your editors and configures them to use GitNexus MCP server globally. You only need to run it once.
+
+## Supported Editors
+
+### Cursor
+
+Writes to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+Also installs agent skills to `~/.cursor/skills/`.
+
+### Claude Code
+
+Prints manual installation command (MCP must be added via CLI):
+
+```bash
+claude mcp add gitnexus -- npx -y gitnexus mcp
+```
+
+Also:
+- Installs agent skills to `~/.claude/skills/`
+- Registers PreToolUse hooks in `~/.claude/settings.json` for automatic context enrichment
+
+### OpenCode
+
+Writes to `~/.config/opencode/config.json`:
+
+```json
+{
+  "mcp": {
+    "gitnexus": {
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+Also installs agent skills to `~/.config/opencode/skill/`.
+
+## Agent Skills
+
+The setup command installs the following skills globally:
+
+- `gitnexus-exploring` — Navigate unfamiliar code using the knowledge graph
+- `gitnexus-debugging` — Trace bugs through call chains
+- `gitnexus-impact-analysis` — Analyze blast radius before changes
+- `gitnexus-refactoring` — Plan safe refactors using dependency mapping
+- `gitnexus-guide` — General usage guide
+- `gitnexus-cli` — CLI reference
+
+Skills are installed per-editor:
+
+- **Cursor**: `~/.cursor/skills/`
+- **Claude Code**: `~/.claude/skills/`
+- **OpenCode**: `~/.config/opencode/skill/`
+
+## Claude Code Hooks
+
+For Claude Code, the setup command registers a **PreToolUse hook** that automatically enriches `Grep`, `Glob`, and `Bash` tool calls with knowledge graph context.
+
+The hook is written to `~/.claude/hooks/gitnexus/gitnexus-hook.cjs` and registered in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"~/.claude/hooks/gitnexus/gitnexus-hook.cjs\"",
+            "timeout": 8000,
+            "statusMessage": "Enriching with GitNexus graph context..."
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This hook intercepts file search and grep operations to automatically inject relevant knowledge graph context, improving AI agent accuracy.
+
+## Windows Support
+
+On Windows, the MCP entry uses `cmd /c npx` instead of `npx` directly, since npx is a `.cmd` script.
+
+## Usage Example
+
+```bash
+gitnexus setup
+```
+
+## Output Example
+
+```
+GitNexus Setup
+==============
+
+Configured:
+  + Cursor
+  + Cursor skills (6 skills → ~/.cursor/skills/)
+  + Claude Code (MCP manual step printed)
+  + Claude Code skills (6 skills → ~/.claude/skills/)
+  + Claude Code hooks (PreToolUse)
+  + OpenCode
+  + OpenCode skills (6 skills → ~/.config/opencode/skill/)
+
+Skipped:
+  - Windsurf (not installed)
+
+Summary:
+  MCP configured for: Cursor, OpenCode
+  Skills installed to: Cursor skills (6 skills → ~/.cursor/skills/), Claude Code skills (6 skills → ~/.claude/skills/), OpenCode skills (6 skills → ~/.config/opencode/skill/)
+
+Next steps:
+  1. cd into any git repo
+  2. Run: gitnexus analyze
+  3. Open the repo in your editor — MCP is ready!
+```
+
+## When to Run
+
+You only need to run this command **once** per machine. It configures MCP globally for all projects.
+
+If you install a new editor later, run `gitnexus setup` again to configure it.
+
+## Related Commands
+
+- [`gitnexus analyze`](/api/commands/analyze) — Index a repository
+- [`gitnexus mcp`](/api/commands/mcp) — Start MCP server manually

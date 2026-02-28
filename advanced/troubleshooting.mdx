@@ -1,0 +1,630 @@
+---
+title: Troubleshooting
+description: Common issues and solutions
+---
+
+## Common Issues
+
+### Out of Memory Errors
+
+#### Symptom
+
+```bash
+JavaScript heap out of memory
+Allocation failed - process out of memory
+```
+
+#### Cause
+
+Large repositories (10,000+ files) may exceed the default Node.js heap limit.
+
+#### Solution
+
+GitNexus **automatically allocates 8GB heap** on first run. If you still hit OOM:
+
+**Option 1: Manual heap increase**
+
+```bash
+NODE_OPTIONS="--max-old-space-size=16384" gitnexus analyze
+```
+
+**Option 2: Skip embeddings**
+
+Embeddings require significant memory. Analyze without them:
+
+```bash
+gitnexus analyze  # Default: no embeddings
+```
+
+**Option 3: Increase system swap**
+
+On Linux/macOS, increase swap space for very large repos.
+
+#### Prevention
+
+- **Exclude large directories**: Add to `.gitignore` before indexing
+- **Skip generated files**: Ensure `dist/`, `build/`, `node_modules/` are ignored
+- **Use embedding limit**: Embeddings auto-skip for repos >50,000 nodes
+
+---
+
+### Stale Index Warning
+
+#### Symptom
+
+```bash
+⚠️  Index is stale (last indexed: 3 days ago, current commit: abc123)
+```
+
+#### Cause
+
+Your repository has new commits since the last index. The knowledge graph may be out of sync with your code.
+
+#### Solution
+
+**Option 1: Re-analyze (incremental)**
+
+```bash
+gitnexus analyze
+```
+
+This **auto-detects changes** and re-indexes only if the commit hash changed.
+
+**Option 2: Force full re-index**
+
+```bash
+gitnexus analyze --force
+```
+
+Ignores staleness check and rebuilds from scratch.
+
+#### Check Index Status
+
+```bash
+gitnexus status
+```
+
+Shows:
+
+- Last indexed commit
+- Current commit
+- Number of nodes/edges
+- Index freshness
+
+---
+
+### Parser Errors
+
+#### Symptom
+
+```bash
+Error parsing file: src/utils/helper.ts
+Tree-sitter parse failed
+```
+
+#### Cause
+
+Tree-sitter may fail on:
+
+- **Minified code** (e.g., `bundle.min.js`)
+- **Extremely large files** (>10MB single file)
+- **Syntax errors** (incomplete or invalid code)
+- **Unsupported language** (file extension not recognized)
+
+#### Solution
+
+**Option 1: Exclude problematic files**
+
+Add to `.gitignore`:
+
+```bash
+# Exclude minified files
+*.min.js
+*.min.css
+
+# Exclude large generated files
+dist/bundle.js
+```
+
+**Option 2: Fix syntax errors**
+
+If the file has syntax errors, fix them first:
+
+```bash
+tsc --noEmit  # For TypeScript
+pylint src/  # For Python
+```
+
+**Option 3: Skip specific files**
+
+GitNexus respects `.gitignore`. Add files you want to skip:
+
+```bash
+echo "src/problematic/file.ts" >> .gitignore
+gitnexus analyze
+```
+
+---
+
+### KuzuDB Errors
+
+#### Symptom
+
+```bash
+KuzuDB initialization failed
+Database file corrupted
+```
+
+#### Cause
+
+- **Corrupted database** (power loss, disk error)
+- **Permission issues** (can't write to `.gitnexus/`)
+- **Disk full** (no space for database)
+
+#### Solution
+
+**Option 1: Delete and re-index**
+
+```bash
+gitnexus clean
+gitnexus analyze
+```
+
+**Option 2: Check disk space**
+
+```bash
+df -h  # Linux/macOS
+```
+
+Ensure you have at least **2x your repo size** in free space.
+
+**Option 3: Check permissions**
+
+```bash
+ls -la .gitnexus/
+```
+
+Ensure you own the directory:
+
+```bash
+sudo chown -R $(whoami) .gitnexus/
+```
+
+---
+
+### Embedding Model Download Fails
+
+#### Symptom
+
+```bash
+Failed to download snowflake-arctic-embed-xs
+Network timeout
+```
+
+#### Cause
+
+- **No internet connection**
+- **Firewall blocking Hugging Face**
+- **Disk full** (model is ~90MB)
+
+#### Solution
+
+**Option 1: Skip embeddings**
+
+```bash
+gitnexus analyze  # Default: no embeddings
+```
+
+You can still use all other features (search, context, impact).
+
+**Option 2: Retry with embeddings**
+
+```bash
+gitnexus analyze --embeddings
+```
+
+**Option 3: Use VPN/proxy**
+
+If Hugging Face is blocked:
+
+```bash
+export HTTPS_PROXY=http://your-proxy:8080
+gitnexus analyze --embeddings
+```
+
+**Option 4: Manual model download**
+
+Download model manually and place in cache:
+
+```bash
+mkdir -p ~/.cache/huggingface/hub/
+# Download from https://huggingface.co/Snowflake/snowflake-arctic-embed-xs
+```
+
+---
+
+### MCP Server Not Responding
+
+#### Symptom
+
+- Cursor/Claude shows "MCP server error"
+- Tools not available
+- "gitnexus not found"
+
+#### Cause
+
+- **Not installed globally** (using `npx` is recommended)
+- **Wrong config path**
+- **Server crashed**
+
+#### Solution
+
+**Option 1: Restart editor**
+
+Close and reopen Cursor/Claude/Windsurf.
+
+**Option 2: Check MCP config**
+
+Verify config file exists:
+
+```bash
+# Cursor
+cat ~/.cursor/mcp.json
+
+# Claude Code
+claude mcp list
+
+# OpenCode
+cat ~/.config/opencode/config.json
+```
+
+Should contain:
+
+```json
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+**Option 3: Run MCP server manually**
+
+Test if the server starts:
+
+```bash
+npx gitnexus mcp
+```
+
+Should output JSON-RPC messages. If it crashes, check the error.
+
+**Option 4: Re-run setup**
+
+```bash
+gitnexus setup
+```
+
+This auto-detects editors and writes the correct config.
+
+---
+
+### "Repository not indexed" Error
+
+#### Symptom
+
+```bash
+Error: Repository not indexed
+No .gitnexus directory found
+```
+
+#### Cause
+
+You're trying to query a repo that hasn't been indexed yet.
+
+#### Solution
+
+**Option 1: Index the repo**
+
+```bash
+cd /path/to/your/repo
+gitnexus analyze
+```
+
+**Option 2: Check you're in the right directory**
+
+```bash
+pwd  # Should be inside your git repo
+git status  # Should show git info
+```
+
+**Option 3: Check global registry**
+
+```bash
+cat ~/.gitnexus/registry.json
+```
+
+If the repo is missing, run `gitnexus analyze` again.
+
+---
+
+### Slow Indexing Performance
+
+#### Symptom
+
+Indexing takes >10 minutes for a medium-sized repo (~1,000 files).
+
+#### Cause
+
+- **Slow disk** (HDD vs SSD)
+- **Many large files** (e.g., 1MB+ source files)
+- **CPU-bound** (single-core or old CPU)
+- **Embeddings enabled** (adds significant time)
+
+#### Solution
+
+**Option 1: Disable embeddings**
+
+```bash
+gitnexus analyze  # 2-5x faster without embeddings
+```
+
+**Option 2: Exclude large directories**
+
+Add to `.gitignore`:
+
+```bash
+vendor/
+third_party/
+*.generated.ts
+```
+
+**Option 3: Use SSD**
+
+Move repo to SSD for faster I/O.
+
+**Option 4: Check CPU usage**
+
+```bash
+top  # Should see 100% CPU (multi-core)
+```
+
+If CPU is low, worker threads may not be starting. Check for errors.
+
+---
+
+### Swift Parser Installation Fails
+
+#### Symptom
+
+```bash
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: tree-sitter-swift
+```
+
+#### Cause
+
+`tree-sitter-swift` is an **optional dependency** that may fail on some platforms.
+
+#### Solution
+
+**Option 1: Ignore it**
+
+This is a warning, not an error. GitNexus will work for all other languages.
+
+**Option 2: Install without optional dependencies**
+
+```bash
+npm install --no-optional gitnexus
+```
+
+**Option 3: Build Swift parser manually**
+
+If you need Swift support:
+
+```bash
+npm install tree-sitter-swift --build-from-source
+```
+
+---
+
+## Performance Tips
+
+### For Large Repositories
+
+1. **Skip embeddings** - Use default (no `--embeddings` flag)
+2. **Exclude generated code** - Add `dist/`, `build/` to `.gitignore`
+3. **Use SSD** - Significantly faster than HDD
+4. **Increase heap** - Use `NODE_OPTIONS="--max-old-space-size=16384"`
+5. **Run overnight** - Very large repos (50,000+ files) may take hours
+
+### For Faster Queries
+
+1. **Use specific queries** - Narrow searches are faster than broad ones
+2. **Leverage processes** - Results grouped by execution flow
+3. **Use context tool** - More efficient than raw Cypher for symbol lookups
+4. **Cache embeddings** - Re-index without `--force` to reuse embeddings
+
+### For Web UI
+
+1. **Use local backend** - Run `gitnexus serve` for already-indexed repos
+2. **Limit file selection** - Don't upload entire repos (use CLI instead)
+3. **Use Chrome/Edge** - WebGPU support for faster embeddings
+
+---
+
+## Diagnostic Commands
+
+### Check Index Status
+
+```bash
+gitnexus status
+```
+
+Shows:
+
+- Index freshness
+- Node/edge counts
+- Last indexed commit
+- Embedding status
+
+### List All Indexed Repos
+
+```bash
+gitnexus list
+```
+
+Shows all repos in global registry.
+
+### Verify KuzuDB
+
+```bash
+du -sh .gitnexus/graph.kuzu
+```
+
+Database size should be ~1-10MB per 1,000 files.
+
+### Test MCP Connection
+
+```bash
+npx gitnexus mcp
+```
+
+Should output JSON-RPC init messages.
+
+---
+
+## Clean Up and Reset
+
+### Delete Index for Current Repo
+
+```bash
+gitnexus clean
+```
+
+Removes `.gitnexus/` directory and unregisters from global registry.
+
+### Delete All Indexes
+
+```bash
+gitnexus clean --all --force
+```
+
+Removes:
+
+- `~/.gitnexus/registry.json`
+- All per-repo `.gitnexus/` directories (requires confirmation)
+
+### Re-index from Scratch
+
+```bash
+gitnexus clean
+gitnexus analyze --force --embeddings
+```
+
+### Clear Embedding Model Cache
+
+```bash
+# Linux/macOS
+rm -rf ~/.cache/huggingface/hub/models--Snowflake--snowflake-arctic-embed-xs
+
+# Windows
+rmdir /s "%LOCALAPPDATA%\huggingface\hub\models--Snowflake--snowflake-arctic-embed-xs"
+```
+
+---
+
+## Debug Mode
+
+### Enable Verbose Logging
+
+```bash
+NODE_ENV=development gitnexus analyze
+```
+
+Shows:
+
+- Detailed pipeline progress
+- Parser stats
+- Memory usage
+- Worker thread activity
+
+### Inspect Database
+
+Use KuzuDB CLI to inspect the graph:
+
+```bash
+npx kuzu .gitnexus/graph.kuzu
+```
+
+Run Cypher queries:
+
+```cypher
+MATCH (f:Function) RETURN f.name LIMIT 10;
+```
+
+---
+
+## Getting Help
+
+### GitHub Issues
+
+Report bugs or request features:
+
+[github.com/abhigyanpatwari/GitNexus/issues](https://github.com/abhigyanpatwari/GitNexus/issues)
+
+### Discussions
+
+Ask questions or share tips:
+
+[github.com/abhigyanpatwari/GitNexus/discussions](https://github.com/abhigyanpatwari/GitNexus/discussions)
+
+### Discord
+
+Join the community:
+
+[Discord link in repo](https://github.com/abhigyanpatwari/GitNexus#readme)
+
+---
+
+## Error Reference
+
+### Exit Codes
+
+- `0` - Success
+- `1` - General error (parse failure, disk error, etc.)
+- `130` - Interrupted (Ctrl+C)
+
+### Common Error Messages
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Not a git repository` | Not inside a git repo | Run `git init` or `cd` to a git repo |
+| `KuzuDB not initialized` | Database connection failed | Run `gitnexus clean` then re-analyze |
+| `Embedder not initialized` | Model failed to load | Skip embeddings or check internet |
+| `Worker thread timeout` | Parsing stuck on a file | Exclude the problematic file |
+| `ENOSPC: no space left` | Disk full | Free up disk space |
+| `EACCES: permission denied` | Can't write to `.gitnexus/` | Check file permissions |
+
+---
+
+## Best Practices
+
+### Before Indexing
+
+1. **Ensure `.gitignore` is clean** - Exclude build artifacts
+2. **Commit or stash changes** - Cleaner index state
+3. **Close other apps** - Free up memory for large repos
+
+### After Indexing
+
+1. **Verify status** - Run `gitnexus status`
+2. **Test MCP tools** - Try `query` tool in your editor
+3. **Re-index on major changes** - After large refactors or branch switches
+
+### Regular Maintenance
+
+1. **Re-index periodically** - Run `gitnexus analyze` after big changes
+2. **Check for updates** - `npm update -g gitnexus` (if installed globally)
+3. **Clean old indexes** - Delete indexes for archived projects

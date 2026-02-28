@@ -1,0 +1,373 @@
+---
+title: detect_changes
+description: Analyze uncommitted git changes and find affected execution flows
+---
+
+## Overview
+
+The `detect_changes` tool analyzes your uncommitted git changes (diff) and maps them to indexed symbols in the knowledge graph, then traces which execution flows are impacted. This is essential for pre-commit review and understanding the scope of your changes.
+
+<Info>
+  **When to use**: Before committing — to understand what your changes affect. Pre-commit review, PR preparation.
+  
+  **Next step**: Review affected processes. Use `context()` on high-risk symbols. READ `gitnexus://repo/{name}/process/{name}` for full traces.
+</Info>
+
+## Parameters
+
+<ParamField path="scope" type="string" default="unstaged">
+  What changes to analyze:
+  
+  - `"unstaged"` - Only unstaged changes (default)
+  - `"staged"` - Only staged changes (what will be committed)
+  - `"all"` - Both staged and unstaged changes
+  - `"compare"` - Compare against a specific branch/commit (requires `base_ref`)
+  
+  **Use cases:**
+  - `"staged"` - Pre-commit check
+  - `"all"` - Full working tree analysis
+  - `"compare"` - PR impact analysis (e.g., comparing against `main`)
+</ParamField>
+
+<ParamField path="base_ref" type="string">
+  Branch or commit to compare against when using `scope: "compare"`
+  
+  **Examples:**
+  - `"main"`
+  - `"develop"`
+  - `"HEAD~3"` (3 commits back)
+  - `"abc123def"` (specific commit hash)
+</ParamField>
+
+<ParamField path="repo" type="string">
+  Repository name or path. Required when multiple repos are indexed. Omit if only one repo is available.
+</ParamField>
+
+## Response
+
+<ResponseField name="changed_symbols" type="array" required>
+  Symbols modified by the git diff
+  
+  <Expandable title="symbol properties">
+    <ResponseField name="uid" type="string">
+      Unique symbol identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Symbol name
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Symbol type (Function, Class, Method, etc.)
+    </ResponseField>
+    
+    <ResponseField name="filePath" type="string">
+      File containing the change
+    </ResponseField>
+    
+    <ResponseField name="changeType" type="string">
+      Type of change: modified, added, deleted
+    </ResponseField>
+    
+    <ResponseField name="linesChanged" type="number">
+      Number of lines affected
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="affected_processes" type="array" required>
+  Execution flows impacted by these changes
+  
+  <Expandable title="process properties">
+    <ResponseField name="name" type="string">
+      Process name (e.g., "LoginFlow", "CheckoutFlow")
+    </ResponseField>
+    
+    <ResponseField name="affectedSteps" type="array">
+      Which steps in the flow are affected
+    </ResponseField>
+    
+    <ResponseField name="totalSteps" type="number">
+      Total steps in this process
+    </ResponseField>
+    
+    <ResponseField name="module" type="string">
+      Functional area this process belongs to
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="risk" type="string" required>
+  Overall risk assessment: **LOW**, **MEDIUM**, **HIGH**, or **CRITICAL**
+  
+  Based on:
+  - Number of changed symbols
+  - Number of affected processes
+  - Criticality of affected modules
+</ResponseField>
+
+<ResponseField name="summary" type="object" required>
+  High-level change summary
+  
+  <Expandable title="properties">
+    <ResponseField name="filesChanged" type="number">
+      Number of files modified
+    </ResponseField>
+    
+    <ResponseField name="symbolsChanged" type="number">
+      Number of symbols modified
+    </ResponseField>
+    
+    <ResponseField name="processesAffected" type="number">
+      Number of execution flows impacted
+    </ResponseField>
+    
+    <ResponseField name="modulesAffected" type="array">
+      List of functional areas touched
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Usage
+
+### Check Unstaged Changes (Default)
+
+```javascript
+detect_changes()
+```
+
+### Pre-Commit Check (Staged Only)
+
+```javascript
+detect_changes({
+  scope: "staged"
+})
+```
+
+### Full Working Tree Analysis
+
+```javascript
+detect_changes({
+  scope: "all"
+})
+```
+
+### PR Impact Analysis
+
+```javascript
+detect_changes({
+  scope: "compare",
+  base_ref: "main"
+})
+```
+
+### Multi-Repo Change Detection
+
+```javascript
+detect_changes({
+  scope: "staged",
+  repo: "my-app"
+})
+```
+
+## Example Response
+
+```json
+{
+  "changed_symbols": [
+    {
+      "uid": "func_validateUser_abc123",
+      "name": "validateUser",
+      "type": "Function",
+      "filePath": "src/auth/validator.ts",
+      "changeType": "modified",
+      "linesChanged": 12
+    },
+    {
+      "uid": "func_checkToken_def456",
+      "name": "checkToken",
+      "type": "Function",
+      "filePath": "src/auth/token.ts",
+      "changeType": "modified",
+      "linesChanged": 5
+    }
+  ],
+  "affected_processes": [
+    {
+      "name": "LoginFlow",
+      "affectedSteps": [2, 3],
+      "totalSteps": 5,
+      "module": "Authentication"
+    },
+    {
+      "name": "TokenRefresh",
+      "affectedSteps": [1],
+      "totalSteps": 3,
+      "module": "Authentication"
+    }
+  ],
+  "risk": "MEDIUM",
+  "summary": {
+    "filesChanged": 2,
+    "symbolsChanged": 2,
+    "processesAffected": 2,
+    "modulesAffected": ["Authentication"]
+  }
+}
+```
+
+## Risk Assessment
+
+| Risk Level | Criteria | Action |
+|-----------|----------|--------|
+| **LOW** | Less than 3 symbols, 1-2 processes, single module | Standard testing |
+| **MEDIUM** | 3-8 symbols, 2-5 processes, 1-2 modules | Careful review, test affected flows |
+| **HIGH** | More than 8 symbols, more than 5 processes, multiple modules | Comprehensive testing, staged deployment |
+| **CRITICAL** | Critical modules (auth, payments), wide impact | Extensive testing, careful monitoring |
+
+## Real-World Examples
+
+### Example 1: Pre-Commit Check
+
+```javascript
+// Task: "What will this commit affect?"
+detect_changes({
+  scope: "staged"
+})
+
+// Result:
+// - Changed: validateUser in validator.ts
+// - Affected: LoginFlow (step 2), TokenRefresh (step 1)
+// - Risk: MEDIUM
+// Action: Test login and token refresh flows before committing
+```
+
+### Example 2: PR Preparation
+
+```javascript
+// Task: "What's the impact of my feature branch vs main?"
+detect_changes({
+  scope: "compare",
+  base_ref: "main"
+})
+
+// Result:
+// - Changed: 12 symbols across 8 files
+// - Affected: CheckoutFlow, PaymentProcessing, RefundHandler
+// - Risk: HIGH
+// Action: Include comprehensive test results in PR description
+```
+
+### Example 3: Debugging Recent Changes
+
+```javascript
+// Task: "Something broke - what did I change?"
+detect_changes({
+  scope: "all"
+})
+
+// Result:
+// - Changed: processPayment (modified), validateCard (modified)
+// - Affected: CheckoutFlow (steps 3, 4)
+// - Risk: MEDIUM
+// Root cause: Changes to validateCard broke checkout
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Run before every commit">
+    Make `detect_changes({scope: "staged"})` part of your pre-commit workflow to understand what you're about to commit.
+  </Accordion>
+  
+  <Accordion title="Use 'compare' for PRs">
+    When preparing a pull request, use `scope: "compare"` with `base_ref: "main"` to see the full impact of your branch.
+  </Accordion>
+  
+  <Accordion title="Review affected processes">
+    Don't just look at changed symbols — review which execution flows are affected. Breaking "LoginFlow" is more critical than a utility function.
+  </Accordion>
+  
+  <Accordion title="Follow up with context()">
+    For high-risk changes, use `context()` on changed symbols to understand their full dependency graph.
+  </Accordion>
+  
+  <Accordion title="Compare risk with impact()">
+    If `detect_changes` shows MEDIUM/HIGH risk, run `impact()` on changed symbols to see the full blast radius.
+  </Accordion>
+</AccordionGroup>
+
+## Workflow Integration
+
+### Pre-Commit Hook
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+# Run GitNexus change detection
+echo "Analyzing impact of staged changes..."
+result=$(npx gitnexus mcp detect_changes --scope staged)
+
+# Check risk level
+if echo "$result" | grep -q "CRITICAL\|HIGH"; then
+  echo "⚠️  High-risk changes detected. Please review carefully."
+  echo "$result"
+  # Optionally block commit: exit 1
+fi
+```
+
+### CI/CD Integration
+
+```yaml
+# .github/workflows/pr-check.yml
+name: PR Impact Analysis
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Analyze PR Impact
+        run: |
+          npx gitnexus mcp detect_changes \
+            --scope compare \
+            --base-ref origin/main
+```
+
+## Use Cases
+
+- **Pre-commit review**: Understand what you're about to commit
+- **PR preparation**: Document the scope of changes
+- **Debugging**: "What did I just change that broke this?"
+- **Code review**: Reviewers can see execution flow impact
+- **Risk assessment**: Automated change risk evaluation
+- **Test planning**: Know which tests to focus on
+
+## Limitations
+
+<Warning>
+  **Index Freshness Required**
+  
+  `detect_changes` maps git diffs to the knowledge graph. If your index is stale (outdated), it may miss recently added symbols or show incorrect mappings.
+  
+  **Solution:** If you see a staleness warning, run `npx gitnexus analyze` before using `detect_changes`.
+</Warning>
+
+## Related Tools
+
+- [impact](/api/tools/impact) - Deeper blast radius analysis for specific symbols
+- [context](/api/tools/context) - Understand changed symbols in detail
+- [rename](/api/tools/rename) - Safe refactoring tool
+
+## Related Resources
+
+- `gitnexus://repo/{name}/processes` - Review affected execution flows
+- `gitnexus://repo/{name}/context` - Check if index is stale

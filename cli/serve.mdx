@@ -1,0 +1,293 @@
+---
+title: gitnexus serve
+description: Start local HTTP server for web UI and remote tool access
+---
+
+The `serve` command starts a local HTTP server that provides:
+
+- REST API for the web UI to query indexed repositories
+- MCP-over-HTTP endpoints for remote AI tool access
+- Multi-repository support (all indexed repos available)
+
+## Usage
+
+```bash
+gitnexus serve [options]
+```
+
+## Options
+
+<ParamField query="port" type="number" default="4747">
+  Port number to bind the server to.
+  
+  **Flag:** `-p, --port <port>`
+</ParamField>
+
+<ParamField query="host" type="string" default="127.0.0.1">
+  Bind address. Use `0.0.0.0` to allow remote connections (e.g., from mobile devices or other machines on your network).
+  
+  **Flag:** `--host <host>`
+</ParamField>
+
+## Examples
+
+### Start Server (Default)
+
+```bash
+gitnexus serve
+```
+
+Server starts on `http://127.0.0.1:4747` (localhost only).
+
+### Custom Port
+
+```bash
+gitnexus serve --port 8080
+```
+
+Server starts on `http://127.0.0.1:8080`.
+
+### Allow Remote Access
+
+```bash
+gitnexus serve --host 0.0.0.0
+```
+
+<Warning>
+Binding to `0.0.0.0` allows anyone on your network to access the server. Only use this on trusted networks.
+</Warning>
+
+Server is accessible at `http://<your-ip>:4747` from any device on the network.
+
+## Output
+
+```
+GitNexus Server
+===============
+
+Endpoint: http://127.0.0.1:4747
+
+Registered repositories:
+  - my-app (1,348 symbols)
+  - backend-service (2,104 symbols)
+
+Web UI: https://gitnexus.vercel.app
+```
+
+## Using with Web UI
+
+1. **Start the server:**
+   ```bash
+   gitnexus serve
+   ```
+
+2. **Open the web UI:**
+   - Navigate to [gitnexus.vercel.app](https://gitnexus.vercel.app)
+   - The UI auto-detects the local server at `http://localhost:4747`
+
+3. **Select repository:**
+   - All indexed repositories are available in the sidebar
+   - Click to switch between repos
+
+4. **Query the graph:**
+   - Use the AI chat interface
+   - Tools automatically route through the local server
+   - No re-uploading or re-indexing required
+
+## API Endpoints
+
+The server exposes REST and MCP-over-HTTP endpoints.
+
+### Repository Management
+
+```http
+GET /repos
+```
+
+Lists all indexed repositories.
+
+**Response:**
+
+```json
+[
+  {
+    "name": "my-app",
+    "path": "/Users/dev/my-app",
+    "stats": {
+      "files": 324,
+      "nodes": 1348,
+      "edges": 3469,
+      "communities": 12,
+      "processes": 104
+    }
+  }
+]
+```
+
+### Graph Queries
+
+```http
+POST /query
+Content-Type: application/json
+
+{
+  "repo": "my-app",
+  "query": "SELECT * FROM Function WHERE name = 'authenticate'"
+}
+```
+
+### MCP-over-HTTP
+
+The server implements the [MCP StreamableHTTP transport](https://spec.modelcontextprotocol.io/specification/2024-11-05/transports/http/).
+
+```http
+POST /mcp/v1/query
+POST /mcp/v1/context
+POST /mcp/v1/impact
+```
+
+## Multi-Repository Support
+
+The server serves **all indexed repositories** from the global registry (`~/.gitnexus/registry.json`).
+
+### Switching Repositories
+
+Most endpoints accept a `repo` parameter:
+
+```http
+POST /query
+{
+  "repo": "backend-service",
+  "query": "..."
+}
+```
+
+### Default Repository
+
+If only one repository is indexed, the `repo` parameter is optional.
+
+## Security
+
+### Localhost Only (Default)
+
+By default, the server binds to `127.0.0.1` and is only accessible from your machine.
+
+### CORS Policy
+
+CORS is restricted to:
+
+- `http://localhost:*`
+- `http://127.0.0.1:*`
+- `https://gitnexus.vercel.app` (official web UI)
+
+### Remote Access
+
+If you bind to `0.0.0.0` for remote access:
+
+- Use a firewall to restrict access to trusted IPs
+- Use HTTPS via reverse proxy (e.g., nginx, Caddy)
+- Consider authentication middleware
+
+<Warning>
+The server does **not** include authentication. Your code is accessible to anyone who can reach the server.
+</Warning>
+
+## Performance
+
+The server loads repositories **on-demand** and caches graph connections.
+
+### Memory Usage
+
+| Repositories | Memory |
+|--------------|--------|
+| 1-2 repos | 200-500 MB |
+| 3-5 repos | 500 MB - 1 GB |
+| 10+ repos | 1-2 GB |
+
+### Concurrent Queries
+
+The server handles concurrent requests efficiently using connection pooling.
+
+## Use Cases
+
+### Local Backend for Web UI
+
+The primary use case — connect the browser-based UI to your local graph databases without re-indexing.
+
+**Advantages:**
+- No upload/download
+- Multi-repo support
+- Instant updates (re-run `gitnexus analyze` to refresh)
+- AI chat with local context
+
+### Remote MCP Access
+
+Use the server as an MCP endpoint for remote AI tools.
+
+**Example: Mobile AI App**
+
+1. Start server with `--host 0.0.0.0`
+2. Connect mobile app to `http://<your-ip>:4747/mcp`
+3. Query your codebase from anywhere on your network
+
+### CI/CD Integration
+
+Run the server in CI to provide graph context to AI-powered code review tools.
+
+```yaml
+# .github/workflows/code-review.yml
+steps:
+  - run: npx gitnexus analyze
+  - run: npx gitnexus serve --port 4747 &
+  - run: ai-code-review --mcp http://localhost:4747/mcp
+```
+
+## Stopping the Server
+
+Press `Ctrl+C` to gracefully shut down.
+
+## Troubleshooting
+
+### Port Already in Use
+
+```
+Error: Port 4747 is already in use
+```
+
+**Solution:**
+
+```bash
+gitnexus serve --port 8080
+```
+
+### No Repositories Found
+
+```
+Warning: No indexed repositories found
+```
+
+**Solution:**
+
+Index a repository first:
+
+```bash
+cd my-project
+gitnexus analyze
+gitnexus serve
+```
+
+### Web UI Can't Connect
+
+Ensure the server is running and accessible:
+
+```bash
+curl http://localhost:4747/repos
+```
+
+Check browser console for CORS errors (if using a custom domain).
+
+## See Also
+
+- [gitnexus analyze](/cli/analyze) — Index repositories
+- [gitnexus list](/cli/list) — View indexed repositories
+- [Web UI Overview](/web/overview) — Learn about the web interface

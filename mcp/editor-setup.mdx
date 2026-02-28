@@ -1,0 +1,250 @@
+---
+title: Editor Setup
+description: Configure MCP for your AI editor
+---
+
+GitNexus provides two ways to configure MCP integration:
+
+1. **Automatic setup** using `gitnexus setup` (recommended)
+2. **Manual configuration** for each editor
+
+## Automatic Setup
+
+Run the setup command once to configure all detected editors:
+
+```bash
+npx gitnexus setup
+```
+
+This command:
+
+- Auto-detects installed editors (Claude Code, Cursor, Windsurf, OpenCode)
+- Writes the correct MCP configuration for each editor
+- Installs agent skills globally where supported
+- Registers PreToolUse hooks for Claude Code
+
+<Accordion title="Example output">
+```
+GitNexus Setup
+==============
+
+Configured:
+  + Cursor
+  + Claude Code (MCP manual step printed)
+  + OpenCode
+  + Cursor skills (6 skills → ~/.cursor/skills/)
+  + Claude Code skills (6 skills → ~/.claude/skills/)
+  + Claude Code hooks (PreToolUse)
+  + OpenCode skills (6 skills → ~/.config/opencode/skill/)
+
+Skipped:
+  - Windsurf (not installed)
+
+Summary:
+  MCP configured for: Cursor, Claude Code, OpenCode
+  Skills installed to: Cursor skills, Claude Code skills, Claude Code hooks, OpenCode skills
+
+Next steps:
+  1. cd into any git repo
+  2. Run: gitnexus analyze
+  3. Open the repo in your editor — MCP is ready!
+```
+</Accordion>
+
+<Note>
+**Global vs Project Config:** The setup command creates **global** configuration that works for all projects. You only need to run it once per machine.
+</Note>
+
+## Manual Configuration
+
+If you prefer manual setup, follow the editor-specific instructions below.
+
+### Claude Code
+
+Claude Code requires a CLI command to add MCP servers:
+
+```bash
+claude mcp add gitnexus -- npx -y gitnexus@latest mcp
+```
+
+This configures:
+- MCP server connection
+- Skills installation (automatic via `gitnexus analyze`)
+- PreToolUse hooks (automatic via `gitnexus setup`)
+
+<Info>
+For full Claude Code integration including PreToolUse hooks, run `gitnexus setup` instead. See [Claude Code Setup](/mcp/claude-code) for details.
+</Info>
+
+### Cursor
+
+Create or edit `~/.cursor/mcp.json` (global configuration):
+
+```json
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+<Tip>
+**Skills:** Run `gitnexus setup` to install skills globally to `~/.cursor/skills/`.
+</Tip>
+
+### Windsurf
+
+Windsurf uses the same configuration format as Cursor.
+
+Create or edit `~/.windsurf/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+<Warning>
+Windsurf does not currently support agent skills. You'll have access to MCP tools only.
+</Warning>
+
+### OpenCode
+
+Add to `~/.config/opencode/config.json`:
+
+```json
+{
+  "mcp": {
+    "gitnexus": {
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+<Tip>
+**Skills:** Run `gitnexus setup` to install skills globally to `~/.config/opencode/skill/`.
+</Tip>
+
+## Windows Configuration
+
+On Windows, `npx` must be invoked via `cmd /c` since it's a `.cmd` script:
+
+```json
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+The `gitnexus setup` command handles this automatically.
+
+## Global vs Project Configuration
+
+### Global Configuration (Recommended)
+
+The configurations shown above are **global** — they work for all projects on your machine:
+
+- **Claude Code:** `~/.claude/` (settings, skills, hooks)
+- **Cursor:** `~/.cursor/mcp.json` and `~/.cursor/skills/`
+- **Windsurf:** `~/.windsurf/mcp.json`
+- **OpenCode:** `~/.config/opencode/config.json` and `~/.config/opencode/skill/`
+
+### Project Configuration
+
+Some editors support project-specific configuration:
+
+- **Cursor:** `.cursorrules` (project-level rules, but MCP must be global)
+- **Claude Code:** Project-level hooks via `.claude/settings.json` (advanced)
+
+<Info>
+**Recommendation:** Use global MCP configuration. The GitNexus MCP server automatically serves all indexed repos from the global registry (`~/.gitnexus/registry.json`).
+</Info>
+
+## Verification
+
+After configuration:
+
+<Steps>
+  <Step title="Index a repository">
+    ```bash
+    cd /path/to/your/repo
+    npx gitnexus analyze
+    ```
+  </Step>
+  
+  <Step title="Open in your editor">
+    Open the repository in your configured editor (Cursor, Claude Code, etc.)
+  </Step>
+  
+  <Step title="Test MCP connection">
+    Ask your AI agent:
+    
+    > "List all indexed repositories"
+    
+    Or explicitly call:
+    
+    > "Use the list_repos tool"
+  </Step>
+  
+  <Step title="Read repo context">
+    Ask your AI agent:
+    
+    > "Read gitnexus://repos"
+    
+    This should show your indexed repository with stats.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### MCP server not starting
+
+1. Verify Node.js is installed: `node --version` (requires >= 18)
+2. Check npx works: `npx gitnexus --version`
+3. Test MCP manually: `npx gitnexus mcp` (should not exit immediately)
+
+### Tools not appearing
+
+1. Check editor MCP logs (location varies by editor)
+2. Verify configuration file syntax (valid JSON)
+3. Restart your editor after configuration changes
+
+### "No repositories indexed" error
+
+1. Run `npx gitnexus analyze` in your repository
+2. Verify index exists: `ls .gitnexus/meta.json`
+3. Check global registry: `cat ~/.gitnexus/registry.json`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Claude Code Setup" icon="code" href="/mcp/claude-code">
+    Full integration with skills and hooks
+  </Card>
+  
+  <Card title="Cursor Setup" icon="cursor" href="/mcp/cursor">
+    MCP and skills for Cursor
+  </Card>
+  
+  <Card title="Multi-Repo Usage" icon="layer-group" href="/mcp/multi-repo">
+    Work with multiple indexed repositories
+  </Card>
+  
+  <Card title="Using the Tools" icon="toolbox" href="/api/tools/query">
+    Learn how to use GitNexus tools effectively
+  </Card>
+</CardGroup>

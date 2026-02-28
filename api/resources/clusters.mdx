@@ -1,0 +1,226 @@
+---
+title: Clusters Resources
+description: Functional areas (modules) detected using Leiden community detection
+---
+
+## gitnexus://repo/{name}/clusters
+
+### Resource URI
+
+```
+gitnexus://repo/{name}/clusters
+```
+
+<ParamField path="name" type="string" required>
+  Repository name from `gitnexus://repos`
+</ParamField>
+
+### Description
+
+Returns all functional areas (clusters/modules) detected in the repository using the Leiden community detection algorithm. Clusters group related code symbols that work together.
+
+**Clusters** represent functional boundaries in your codebase — authentication, database access, API handlers, etc.
+
+### Returns
+
+<ResponseField name="modules" type="array">
+  List of detected functional areas (top 20)
+  
+  <Expandable title="properties">
+    <ResponseField name="name" type="string">
+      Human-readable cluster label (heuristic-based)
+    </ResponseField>
+    
+    <ResponseField name="symbols" type="number">
+      Number of code symbols in this cluster
+    </ResponseField>
+    
+    <ResponseField name="cohesion" type="string" optional>
+      Internal cohesion percentage (higher = tighter coupling within cluster)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### When to Use
+
+- **Understanding architecture**: See how code is organized
+- **Finding related code**: Identify which symbols work together
+- **Planning changes**: Understand functional boundaries
+- **Exploring unfamiliar codebases**: Quick architectural overview
+
+### Example Response
+
+#### With Clusters
+
+```yaml
+modules:
+  - name: "Authentication"
+    symbols: 23
+    cohesion: 78%
+  - name: "Database"
+    symbols: 45
+    cohesion: 82%
+  - name: "API Routes"
+    symbols: 67
+    cohesion: 71%
+  - name: "User Management"
+    symbols: 34
+    cohesion: 75%
+  - name: "Payment Processing"
+    symbols: 28
+    cohesion: 80%
+
+# Showing top 20 of 47 modules. Use gitnexus_query for deeper search.
+```
+
+#### No Clusters
+
+```yaml
+modules: []
+# No functional areas detected. Run: gitnexus analyze
+```
+
+### Cohesion Scores
+
+Cohesion indicates how tightly related the symbols within a cluster are:
+- **80-100%**: Very tight coupling, likely a well-defined module
+- **60-79%**: Good cohesion, functional area is clear
+- **40-59%**: Moderate cohesion, may contain mixed responsibilities
+- **< 40%**: Low cohesion, cluster may be too broad
+
+---
+
+## gitnexus://repo/{name}/cluster/{clusterName}
+
+### Resource URI
+
+```
+gitnexus://repo/{name}/cluster/{clusterName}
+```
+
+<ParamField path="name" type="string" required>
+  Repository name from `gitnexus://repos`
+</ParamField>
+
+<ParamField path="clusterName" type="string" required>
+  Cluster name from the `clusters` resource
+</ParamField>
+
+### Description
+
+Returns detailed information about a specific cluster, including all member symbols with their types and file locations.
+
+Use this to **deep-dive into a functional area** and see exactly what code belongs to it.
+
+### Returns
+
+<ResponseField name="module" type="string">
+  Cluster name
+</ResponseField>
+
+<ResponseField name="symbols" type="number">
+  Total member count
+</ResponseField>
+
+<ResponseField name="cohesion" type="string" optional>
+  Internal cohesion percentage
+</ResponseField>
+
+<ResponseField name="members" type="array">
+  List of symbols in this cluster (top 20)
+  
+  <Expandable title="properties">
+    <ResponseField name="name" type="string">
+      Symbol name (function, class, etc.)
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Symbol type: Function, Class, Method, Interface, etc.
+    </ResponseField>
+    
+    <ResponseField name="file" type="string">
+      File path relative to repository root
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### When to Use
+
+- **After reading `clusters`**: Get details on interesting areas
+- **Understanding module scope**: See all symbols in a functional area
+- **Impact analysis**: Know what files are part of a module
+- **Refactoring planning**: Identify module boundaries
+
+### Example Response
+
+```yaml
+module: "Authentication"
+symbols: 23
+cohesion: 78%
+
+members:
+  - name: login
+    type: Function
+    file: src/auth/login.ts
+  - name: logout
+    type: Function
+    file: src/auth/logout.ts
+  - name: AuthProvider
+    type: Class
+    file: src/auth/provider.ts
+  - name: validateToken
+    type: Function
+    file: src/auth/validate.ts
+  - name: refreshToken
+    type: Function
+    file: src/auth/refresh.ts
+  - name: AuthMiddleware
+    type: Class
+    file: src/middleware/auth.ts
+  - name: hashPassword
+    type: Function
+    file: src/auth/utils.ts
+  - name: comparePasswords
+    type: Function
+    file: src/auth/utils.ts
+  # ... and 15 more
+```
+
+### Error Response
+
+```yaml
+error: Cluster "InvalidName" not found
+```
+
+## Workflow
+
+Typical cluster exploration workflow:
+
+<Steps>
+  <Step title="List All Clusters">
+    Read `gitnexus://repo/{name}/clusters` to see available modules
+  </Step>
+  
+  <Step title="Identify Interesting Areas">
+    Look at cluster names and cohesion scores
+  </Step>
+  
+  <Step title="Deep Dive">
+    Read `gitnexus://repo/{name}/cluster/{clusterName}` for specific modules
+  </Step>
+  
+  <Step title="Analyze Symbols">
+    Use the `context` tool on specific symbols to understand their relationships
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Context Tool" icon="magnifying-glass" href="/api/tools/context">
+    Get 360-degree view of specific symbols
+  </Card>
+  <Card title="Processes Resource" icon="route" href="/api/resources/processes">
+    View execution flows
+  </Card>
+</CardGroup>

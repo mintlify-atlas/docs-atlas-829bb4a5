@@ -1,0 +1,350 @@
+---
+title: Installation
+description: Detailed installation instructions, system requirements, and verification steps for GitNexus.
+---
+
+## System requirements
+
+Before installing GitNexus, ensure your system meets these requirements:
+
+| Requirement | Version |
+|------------|--------|
+| **Node.js** | >= 18.0.0 |
+| **Git** | Any recent version |
+| **Operating System** | Linux, macOS, or Windows |
+
+<Note>
+  GitNexus uses native bindings for Tree-sitter and KuzuDB. These are pre-compiled for most platforms and installed automatically.
+</Note>
+
+## Installation methods
+
+### Use without installing (recommended)
+
+The fastest way to use GitNexus is with `npx` — no installation required:
+
+```bash
+npx gitnexus analyze
+```
+
+This downloads the latest version, runs the indexing, and exits. Perfect for trying GitNexus or one-off analysis.
+
+### Global installation
+
+For regular use, install GitNexus globally:
+
+```bash
+npm install -g gitnexus
+```
+
+Now you can run `gitnexus` commands from anywhere:
+
+```bash
+gitnexus analyze
+gitnexus setup
+gitnexus list
+```
+
+### Local installation
+
+You can also install GitNexus as a dev dependency in a specific project:
+
+```bash
+npm install --save-dev gitnexus
+```
+
+Then use it via npm scripts:
+
+```json package.json
+{
+  "scripts": {
+    "index": "gitnexus analyze",
+    "index:force": "gitnexus analyze --force"
+  }
+}
+```
+
+<Warning>
+  Local installation means each project gets its own copy of GitNexus. This is useful for CI/CD but not recommended for general development (use global install instead).
+</Warning>
+
+## Verify installation
+
+Check that GitNexus is installed correctly:
+
+```bash
+gitnexus --version
+```
+
+You should see the current version number (e.g., `1.3.6`).
+
+## Supported languages
+
+GitNexus supports parsing and indexing for these languages:
+
+<CardGroup cols={3}>
+  <Card title="TypeScript" icon="code">
+    Full support for TS syntax, imports, and type resolution.
+  </Card>
+  <Card title="JavaScript" icon="js">
+    ES6+, CommonJS, and ESM.
+  </Card>
+  <Card title="Python" icon="python">
+    Classes, functions, imports.
+  </Card>
+  <Card title="Java" icon="java">
+    Classes, methods, inheritance.
+  </Card>
+  <Card title="C" icon="c">
+    Functions, headers.
+  </Card>
+  <Card title="C++" icon="code">
+    Classes, templates, inheritance.
+  </Card>
+  <Card title="C#" icon="code">
+    Classes, methods, namespaces.
+  </Card>
+  <Card title="Go" icon="golang">
+    Packages, functions, interfaces.
+  </Card>
+  <Card title="Rust" icon="rust">
+    Modules, functions, traits, impls.
+  </Card>
+  <Card title="PHP" icon="php">
+    Classes, functions, namespaces.
+  </Card>
+  <Card title="Swift" icon="swift">
+    Classes, protocols, extensions.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Language support is based on Tree-sitter grammars. If you need support for additional languages, [open an issue on GitHub](https://github.com/abhigyanpatwari/GitNexus/issues).
+</Tip>
+
+## Post-install setup
+
+### 1. Index your first repository
+
+Navigate to any git repository and run:
+
+```bash
+cd ~/projects/my-app
+gitnexus analyze
+```
+
+This creates a `.gitnexus/` directory with the knowledge graph. The directory is automatically added to `.gitignore`.
+
+<Steps>
+  <Step title="Scanning files">
+    GitNexus walks the file tree and identifies source files.
+  </Step>
+  <Step title="Parsing code">
+    Tree-sitter extracts functions, classes, methods, and interfaces.
+  </Step>
+  <Step title="Resolving imports">
+    Language-aware import resolution maps dependencies.
+  </Step>
+  <Step title="Tracing calls">
+    Call chain detection builds the execution graph.
+  </Step>
+  <Step title="Detecting communities">
+    Leiden algorithm groups related symbols into functional clusters.
+  </Step>
+  <Step title="Detecting processes">
+    Execution flows traced from entry points through call chains.
+  </Step>
+  <Step title="Creating indexes">
+    Full-text search and vector embeddings for hybrid search.
+  </Step>
+</Steps>
+
+### 2. Configure MCP for your editor
+
+Run the auto-setup:
+
+```bash
+gitnexus setup
+```
+
+This detects your installed editors and writes the correct global MCP config.
+
+Supported editors:
+- **Claude Code**: Full support (MCP + skills + hooks)
+- **Cursor**: MCP + skills
+- **Windsurf**: MCP only
+- **OpenCode**: MCP + skills
+
+See the [quickstart guide](/mcp/editor-setup) for manual configuration.
+
+### 3. Verify MCP connection
+
+Restart your editor, then ask your AI agent:
+
+```
+List all indexed repositories
+```
+
+You should see your repo with stats like:
+
+```
+my-app
+  Path: /Users/you/projects/my-app
+  Symbols: 1,348
+  Relationships: 3,469
+  Processes: 104
+  Last indexed: 2 minutes ago
+```
+
+## CLI commands reference
+
+Here are all the commands you'll use:
+
+### Core commands
+
+```bash
+# Index a repository (or update stale index)
+gitnexus analyze
+
+# Force full re-index
+gitnexus analyze --force
+
+# Skip embedding generation (faster, but no semantic search)
+gitnexus analyze --skip-embeddings
+
+# Configure MCP for your editors (one-time)
+gitnexus setup
+
+# Start MCP server (stdio) — serves all indexed repos
+gitnexus mcp
+```
+
+### Management commands
+
+```bash
+# List all indexed repositories
+gitnexus list
+
+# Show index status for current repo
+gitnexus status
+
+# Delete index for current repo
+gitnexus clean
+
+# Delete all indexes (requires --force)
+gitnexus clean --all --force
+```
+
+### Advanced commands
+
+```bash
+# Start local HTTP server for web UI connection
+gitnexus serve
+
+# Generate repository wiki from knowledge graph
+gitnexus wiki
+
+# Wiki with custom LLM model
+gitnexus wiki --model gpt-4o
+
+# Wiki with custom LLM API base URL
+gitnexus wiki --base-url https://api.anthropic.com/v1
+```
+
+<Tip>
+  The `serve` command starts a local HTTP server that the web UI can connect to. This lets you browse all your CLI-indexed repos in the browser without re-uploading or re-indexing.
+</Tip>
+
+## Storage and privacy
+
+### Where data is stored
+
+GitNexus stores data in two places:
+
+1. **Per-repo index**: `.gitnexus/` inside each indexed repository
+   - Knowledge graph database (KuzuDB)
+   - Search indexes (BM25 + embeddings)
+   - Metadata (last commit, indexed date)
+   - Automatically added to `.gitignore`
+
+2. **Global registry**: `~/.gitnexus/registry.json`
+   - List of all indexed repos
+   - Paths and metadata only (no code)
+   - Used by MCP server to discover repos
+
+### Privacy guarantees
+
+<CardGroup cols={2}>
+  <Card title="No network calls" icon="wifi-slash">
+    GitNexus CLI runs 100% locally. No telemetry, no analytics, no phone-home.
+  </Card>
+  <Card title="No cloud uploads" icon="cloud-slash">
+    Your code stays on your machine. Nothing is uploaded to any server.
+  </Card>
+  <Card title="Gitignored by default" icon="ban">
+    The `.gitnexus/` directory is automatically added to `.gitignore`.
+  </Card>
+  <Card title="Open source" icon="code">
+    Audit the code yourself: [github.com/abhigyanpatwari/GitNexus](https://github.com/abhigyanpatwari/GitNexus)
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### "Not inside a git repository"
+
+GitNexus only indexes git repositories. If you see this error:
+
+```bash
+cd /path/to/repo
+git init  # if not already a git repo
+gitnexus analyze
+```
+
+### "Module did not self-register"
+
+This error means native bindings (Tree-sitter or KuzuDB) failed to load. Usually caused by Node version mismatch.
+
+**Fix:**
+1. Check Node version: `node --version` (must be >= 18)
+2. Reinstall GitNexus: `npm install -g gitnexus`
+3. If still failing, [open an issue](https://github.com/abhigyanpatwari/GitNexus/issues) with your Node version and OS
+
+### Large repos / out of memory
+
+GitNexus automatically increases heap size to 8GB for large repos. If you still hit memory limits:
+
+```bash
+# Skip embeddings to reduce memory usage
+gitnexus analyze --skip-embeddings
+```
+
+Note: This disables semantic search, but all other features work.
+
+### Stale index warning
+
+If you see "Index is stale" warnings from MCP resources:
+
+```bash
+cd /path/to/repo
+gitnexus analyze  # re-index to pick up new commits
+```
+
+GitNexus automatically detects when the repo has new commits and needs re-indexing.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in under 2 minutes.
+  </Card>
+  <Card title="MCP integration" icon="plug" href="/mcp/overview">
+    Learn about tools, resources, and prompts.
+  </Card>
+  <Card title="Web UI" icon="globe" href="https://gitnexus.vercel.app">
+    Try the browser-based graph explorer.
+  </Card>
+  <Card title="CLI reference" icon="terminal" href="/cli/overview">
+    Full CLI command documentation.
+  </Card>
+</CardGroup>

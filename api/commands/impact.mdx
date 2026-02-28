@@ -1,0 +1,213 @@
+---
+title: gitnexus impact
+description: Blast radius analysis for code changes
+---
+
+## Syntax
+
+```bash
+gitnexus impact <target>
+```
+
+## Description
+
+Blast radius analysis: what breaks if you change a symbol. This is a direct CLI wrapper for the [`impact`](/api/tools/impact) MCP tool.
+
+Analyzes the dependency graph to find:
+
+- **Upstream** (dependants) — What calls this symbol and would break if it changes
+- **Downstream** (dependencies) — What this symbol calls and might need updating
+
+Results are grouped by depth (1, 2, 3 hops) with confidence scores.
+
+## Arguments
+
+<ParamField path="target" type="string" required>
+  Symbol name to analyze (e.g., "validateUser", "AuthService").
+</ParamField>
+
+## Options
+
+<ParamField path="--direction" type="string" optional>
+  Analysis direction.
+  
+  **Values**: `upstream` (dependants) or `downstream` (dependencies)
+  
+  **Default**: `upstream`
+</ParamField>
+
+<ParamField path="--repo" type="string" optional>
+  Target repository name. Omit if only one repository is indexed.
+</ParamField>
+
+<ParamField path="--depth" type="number" optional>
+  Maximum relationship depth to analyze.
+  
+  **Default**: `3`
+</ParamField>
+
+<ParamField path="--include-tests" type="boolean" optional>
+  Include test files in results.
+  
+  **Default**: `false`
+</ParamField>
+
+## Usage Examples
+
+### Basic upstream analysis
+
+```bash
+gitnexus impact validateUser
+```
+
+### Downstream dependencies
+
+```bash
+gitnexus impact AuthService --direction downstream
+```
+
+### Include test files
+
+```bash
+gitnexus impact validateUser --include-tests
+```
+
+### Limit depth
+
+```bash
+gitnexus impact AuthService --depth 2
+```
+
+### Specific repository
+
+```bash
+gitnexus impact validateUser --repo backend-api
+```
+
+## Output Format
+
+Results are returned as JSON on **stderr**:
+
+```json
+{
+  "target": {
+    "name": "validateUser",
+    "type": "Function",
+    "file": "src/auth/validator.ts",
+    "line": 42
+  },
+  "direction": "upstream",
+  "impact": {
+    "depth_1": [
+      {
+        "name": "login",
+        "file": "src/auth/login.ts",
+        "line": 18,
+        "type": "Function",
+        "confidence": "high"
+      }
+    ],
+    "depth_2": [
+      {
+        "name": "handleAuth",
+        "file": "src/api/auth.ts",
+        "line": 32,
+        "type": "Function",
+        "confidence": "medium"
+      }
+    ],
+    "depth_3": []
+  },
+  "total_affected": 2,
+  "risk_level": "medium"
+}
+```
+
+## Direction Types
+
+### Upstream (dependants)
+
+**What calls this symbol** — use this before making breaking changes:
+
+```bash
+gitnexus impact validateUser --direction upstream
+```
+
+Example:
+
+```
+validateUser (target)
+  ↑ called by login
+    ↑ called by handleAuth
+      ↑ called by authMiddleware
+```
+
+### Downstream (dependencies)
+
+**What this symbol calls** — use this to understand what might need updating:
+
+```bash
+gitnexus impact AuthService --direction downstream
+```
+
+Example:
+
+```
+AuthService (target)
+  ↓ calls validateUser
+    ↓ calls hashPassword
+      ↓ calls crypto.pbkdf2
+```
+
+## Confidence Scores
+
+- **high** — Direct call relationship
+- **medium** — Indirect call (depth 2)
+- **low** — Distant relationship (depth 3+)
+
+## Risk Levels
+
+- **low** — 1-5 affected symbols
+- **medium** — 6-20 affected symbols
+- **high** — 21+ affected symbols
+
+## When to Use
+
+Use `gitnexus impact` before:
+
+- **Refactoring** — Understand blast radius
+- **Breaking changes** — Find all affected callers
+- **Deleting code** — Check if anything depends on it
+- **API changes** — See downstream impact
+
+## Test Files
+
+By default, test files are excluded from impact analysis to reduce noise. Include them with `--include-tests`:
+
+```bash
+gitnexus impact validateUser --include-tests
+```
+
+## Multi-Repo Support
+
+If you have multiple repositories indexed, specify which one:
+
+```bash
+gitnexus impact AuthService --repo backend-api
+```
+
+## Output Destination
+
+All output goes to **stderr** instead of stdout because KuzuDB's native module captures stdout at the OS level.
+
+To redirect to a file:
+
+```bash
+gitnexus impact validateUser 2> impact.json
+```
+
+## Related Commands
+
+- [`gitnexus query`](/api/commands/query) — Search for execution flows
+- [`gitnexus context`](/api/commands/context) — 360-degree symbol view
+- [`gitnexus cypher`](/api/commands/cypher) — Raw graph queries

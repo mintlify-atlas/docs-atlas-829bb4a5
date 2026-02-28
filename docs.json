@@ -1,122 +1,146 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "GitNexus",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#6366f1",
+    "light": "#818cf8",
+    "dark": "#4f46e5"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/abhigyanpatwari/GitNexus"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/abhigyanpatwari/GitNexus"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/knowledge-graph",
+              "concepts/indexing-pipeline",
+              "concepts/hybrid-search",
+              "concepts/processes-and-flows"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "CLI Usage",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "cli/overview",
+              "cli/analyze",
+              "cli/setup",
+              "cli/serve",
+              "cli/clean",
+              "cli/wiki"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "MCP Integration",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "mcp/overview",
+              "mcp/editor-setup",
+              "mcp/claude-code",
+              "mcp/cursor",
+              "mcp/multi-repo"
+            ]
+          },
+          {
+            "group": "Agent Skills",
+            "pages": [
+              "skills/overview",
+              "skills/exploring",
+              "skills/debugging",
+              "skills/impact-analysis",
+              "skills/refactoring"
+            ]
+          },
+          {
+            "group": "Web UI",
+            "pages": [
+              "web/overview",
+              "web/getting-started",
+              "web/local-backend"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/supported-languages",
+              "advanced/architecture",
+              "advanced/privacy-security",
+              "advanced/troubleshooting"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "MCP Tools",
             "pages": [
-              "api-reference/introduction"
+              "api/tools/list-repos",
+              "api/tools/query",
+              "api/tools/context",
+              "api/tools/impact",
+              "api/tools/detect-changes",
+              "api/tools/rename",
+              "api/tools/cypher"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "MCP Resources",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/resources/overview",
+              "api/resources/repos",
+              "api/resources/context",
+              "api/resources/clusters",
+              "api/resources/processes"
+            ]
+          },
+          {
+            "group": "MCP Prompts",
+            "pages": [
+              "api/prompts/detect-impact",
+              "api/prompts/generate-map"
+            ]
+          },
+          {
+            "group": "CLI Commands",
+            "pages": [
+              "api/commands/analyze",
+              "api/commands/setup",
+              "api/commands/mcp",
+              "api/commands/serve",
+              "api/commands/list",
+              "api/commands/status",
+              "api/commands/clean",
+              "api/commands/wiki",
+              "api/commands/query",
+              "api/commands/context",
+              "api/commands/impact",
+              "api/commands/cypher"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

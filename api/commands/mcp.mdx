@@ -1,0 +1,129 @@
+---
+title: gitnexus mcp
+description: Start the MCP server in stdio mode
+---
+
+## Syntax
+
+```bash
+gitnexus mcp
+```
+
+## Description
+
+Starts the MCP server in stdio mode, serving all indexed repositories. This command is typically invoked automatically by your AI editor's MCP configuration.
+
+The MCP server:
+
+- Loads all indexed repositories from the global registry (`~/.gitnexus/registry.json`)
+- Exposes all GitNexus tools via the Model Context Protocol
+- Discovers new repositories lazily (repos indexed after the server starts are picked up automatically)
+- Runs continuously until the editor closes
+
+## Multi-Repo Support
+
+The MCP server serves **all indexed repositories** automatically. When you have multiple repos indexed:
+
+- Tools accept an optional `repo` parameter to specify which repository to query
+- If only one repo is indexed, the `repo` parameter is optional
+- If multiple repos are indexed and no `repo` is specified, the tool returns an error
+
+## Error Handling
+
+The MCP server is designed to be resilient:
+
+- **Uncaught exceptions** are logged but don't crash the server
+- **KuzuDB lock conflicts** degrade gracefully
+- **Zero repos** — The server starts even with no indexed repos. It prints a warning but remains running, and tools will discover repos lazily.
+
+## How Editors Use It
+
+Typical MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "npx",
+      "args": ["-y", "gitnexus@latest", "mcp"]
+    }
+  }
+}
+```
+
+The editor spawns this command as a subprocess and communicates via stdio using the MCP protocol.
+
+## Manual Usage
+
+You typically don't run this command manually. Use [`gitnexus setup`](/api/commands/setup) to configure your editor to run it automatically.
+
+However, you can test it manually:
+
+```bash
+gitnexus mcp
+```
+
+The server will print to stderr (since stdout is reserved for MCP protocol messages):
+
+```
+GitNexus: MCP server starting with 2 repo(s): my-app, backend-api
+```
+
+Or if no repos are indexed:
+
+```
+GitNexus: No indexed repos yet. Run `gitnexus analyze` in a git repo — the server will pick it up automatically.
+```
+
+## MCP Tools Exposed
+
+| Tool | Description |
+|------|-------------|
+| `list_repos` | List all indexed repositories |
+| `query` | Process-grouped hybrid search (BM25 + semantic + RRF) |
+| `context` | 360-degree symbol view — categorized refs, process participation |
+| `impact` | Blast radius analysis with depth grouping and confidence |
+| `detect_changes` | Git-diff impact — maps changed lines to affected processes |
+| `rename` | Multi-file coordinated rename with graph + text search |
+| `cypher` | Raw Cypher graph queries |
+
+See the [MCP Tools Reference](/api/tools/query) for detailed documentation.
+
+## MCP Resources Exposed
+
+| Resource | Description |
+|----------|-------------|
+| `gitnexus://repos` | List all indexed repositories |
+| `gitnexus://repo/{name}/context` | Codebase stats, staleness check, and available tools |
+| `gitnexus://repo/{name}/clusters` | All functional clusters with cohesion scores |
+| `gitnexus://repo/{name}/cluster/{name}` | Cluster members and details |
+| `gitnexus://repo/{name}/processes` | All execution flows |
+| `gitnexus://repo/{name}/process/{name}` | Full process trace with steps |
+| `gitnexus://repo/{name}/schema` | Graph schema for Cypher queries |
+
+See the [MCP Resources Reference](/api/resources/repos) for detailed documentation.
+
+## MCP Prompts Exposed
+
+| Prompt | Description |
+|--------|-------------|
+| `detect_impact` | Pre-commit change analysis — scope, affected processes, risk level |
+| `generate_map` | Architecture documentation from the knowledge graph with mermaid diagrams |
+
+See the [MCP Prompts Reference](/api/prompts/detect-impact) for detailed documentation.
+
+## Lazy Repository Discovery
+
+The MCP server doesn't require a restart when you index new repositories. Tools call `refreshRepos()` internally before each operation, automatically discovering repos indexed after the server started.
+
+This means you can:
+
+1. Start your editor (MCP server starts)
+2. Index a new repo: `gitnexus analyze`
+3. Use MCP tools immediately — no restart needed
+
+## Related Commands
+
+- [`gitnexus setup`](/api/commands/setup) — Configure MCP for your editor
+- [`gitnexus serve`](/api/commands/serve) — Start HTTP server for web UI
+- [`gitnexus list`](/api/commands/list) — List all indexed repositories

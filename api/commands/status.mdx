@@ -1,0 +1,116 @@
+---
+title: gitnexus status
+description: Show index status for current repository
+---
+
+## Syntax
+
+```bash
+gitnexus status
+```
+
+## Description
+
+Shows the indexing status of the current repository. Must be run from within a git repository.
+
+The command:
+
+- Checks if the current directory is a git repository
+- Looks up the repository in the global registry
+- Compares the indexed commit with the current commit
+- Reports whether the index is up-to-date or stale
+
+## Output Example
+
+### Up-to-date index
+
+```
+Repository: /Users/dev/projects/my-app
+Indexed: 2/28/2026, 10:30:00 AM
+Indexed commit: a3f9c21
+Current commit: a3f9c21
+Status: ✅ up-to-date
+```
+
+### Stale index
+
+```
+Repository: /Users/dev/projects/my-app
+Indexed: 2/27/2026, 3:45:00 PM
+Indexed commit: b8e2d44
+Current commit: a3f9c21
+Status: ⚠️ stale (re-run gitnexus analyze)
+```
+
+### Not indexed
+
+```
+Repository not indexed.
+Run: gitnexus analyze
+```
+
+### Not a git repository
+
+```
+Not a git repository.
+```
+
+## When Index is Stale
+
+The index becomes stale when:
+
+- New commits are made after indexing
+- Files are modified but not committed (the index only tracks committed state)
+- Branches are switched
+
+To update a stale index:
+
+```bash
+gitnexus analyze
+```
+
+The analyze command auto-detects staleness and performs an incremental update if possible.
+
+## Use Cases
+
+### Before using MCP tools
+
+Check if your index is current:
+
+```bash
+gitnexus status
+```
+
+### CI/CD integration
+
+Verify index freshness in CI:
+
+```bash
+gitnexus status
+if [ $? -ne 0 ]; then
+  gitnexus analyze
+fi
+```
+
+### After switching branches
+
+```bash
+git checkout feature-branch
+gitnexus status
+# If stale:
+gitnexus analyze
+```
+
+## What Gets Checked
+
+- **Repository path** — Absolute path to the git root
+- **Indexed timestamp** — When the index was last built
+- **Indexed commit** — Git SHA that was indexed (first 7 characters)
+- **Current commit** — Current git HEAD (first 7 characters)
+- **Status** — Whether the commits match
+
+## Related Commands
+
+- [`gitnexus analyze`](/api/commands/analyze) — Update the index
+- [`gitnexus list`](/api/commands/list) — List all indexed repositories
+- [`gitnexus clean`](/api/commands/clean) — Delete the index

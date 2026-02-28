@@ -1,0 +1,418 @@
+---
+title: impact
+description: Analyze the blast radius of changing a code symbol
+---
+
+## Overview
+
+The `impact` tool performs blast radius analysis to show what will be affected if you change a specific symbol. It returns affected symbols grouped by depth (d=1, d=2, d=3), risk assessment, affected execution flows, and impacted functional modules. This is essential before making any non-trivial code changes.
+
+<Info>
+  **When to use**: Before making code changes — especially refactoring, renaming, or modifying shared code. Shows what would break.
+  
+  **Next step**: Review d=1 items (WILL BREAK). Use `context()` on high-risk symbols.
+</Info>
+
+## Parameters
+
+<ParamField path="target" type="string" required>
+  Name of function, class, method, or file to analyze
+  
+  **Examples:**
+  - `"validateUser"`
+  - `"AuthService"`
+  - `"src/auth/validator.ts"`
+</ParamField>
+
+<ParamField path="direction" type="string" required>
+  Analysis direction:
+  - `"upstream"` - What depends on this (most common)
+  - `"downstream"` - What this depends on
+</ParamField>
+
+<ParamField path="maxDepth" type="number" default={3}>
+  Maximum relationship depth to traverse
+  
+  - **d=1**: Direct dependencies (WILL BREAK)
+  - **d=2**: Indirect dependencies (LIKELY AFFECTED)
+  - **d=3**: Transitive dependencies (MAY NEED TESTING)
+  
+  Range: 1-5 recommended
+</ParamField>
+
+<ParamField path="relationTypes" type="array">
+  Filter by relationship types. If omitted, uses usage-based inference.
+  
+  **Options:**
+  - `"CALLS"` - Function/method calls
+  - `"IMPORTS"` - Import statements
+  - `"EXTENDS"` - Class inheritance
+  - `"IMPLEMENTS"` - Interface implementation
+  
+  **Example:** `["CALLS", "IMPORTS"]`
+</ParamField>
+
+<ParamField path="includeTests" type="boolean" default={false}>
+  Include test files in the analysis
+  
+  Set to `true` when you need to know which tests will break.
+</ParamField>
+
+<ParamField path="minConfidence" type="number" default={0.7}>
+  Minimum confidence threshold (0-1) for relationships
+  
+  - **1.0**: Certain relationships
+  - **0.8-0.99**: High confidence
+  - **0.7-0.79**: Good confidence
+  - **Below 0.7**: Fuzzy matches
+  
+  Lower this to catch more potential impacts at the cost of false positives.
+</ParamField>
+
+<ParamField path="repo" type="string">
+  Repository name or path. Required when multiple repos are indexed.
+</ParamField>
+
+## Response
+
+<ResponseField name="risk" type="string" required>
+  Overall risk assessment: **LOW**, **MEDIUM**, **HIGH**, or **CRITICAL**
+</ResponseField>
+
+<ResponseField name="summary" type="object" required>
+  High-level impact summary
+  
+  <Expandable title="properties">
+    <ResponseField name="directCallers" type="number">
+      Number of direct dependents (d=1)
+    </ResponseField>
+    
+    <ResponseField name="affectedProcesses" type="number">
+      Number of execution flows affected
+    </ResponseField>
+    
+    <ResponseField name="affectedModules" type="number">
+      Number of functional areas impacted
+    </ResponseField>
+    
+    <ResponseField name="totalAffected" type="number">
+      Total symbols affected across all depths
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="byDepth" type="object" required>
+  Affected symbols grouped by traversal depth
+  
+  <Expandable title="depth groups">
+    <ResponseField name="d1" type="array">
+      **WILL BREAK** - Direct callers/importers that must be updated
+    </ResponseField>
+    
+    <ResponseField name="d2" type="array">
+      **LIKELY AFFECTED** - Indirect dependencies that may need updates
+    </ResponseField>
+    
+    <ResponseField name="d3" type="array">
+      **MAY NEED TESTING** - Transitive effects requiring validation
+    </ResponseField>
+  </Expandable>
+  
+  Each array contains symbols with:
+  - `name`: Symbol name
+  - `type`: Symbol type
+  - `filePath`: File location
+  - `line`: Line number
+  - `edgeType`: Relationship type (CALLS, IMPORTS, etc.)
+  - `confidence`: Confidence score (0-1)
+</ResponseField>
+
+<ResponseField name="affected_processes" type="array">
+  Execution flows that will be impacted
+  
+  <Expandable title="process properties">
+    <ResponseField name="name" type="string">
+      Process name
+    </ResponseField>
+    
+    <ResponseField name="step" type="number">
+      At which step the target appears
+    </ResponseField>
+    
+    <ResponseField name="totalSteps" type="number">
+      Total steps in this flow
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="affected_modules" type="object">
+  Functional areas impacted, categorized by impact type
+  
+  <Expandable title="categories">
+    <ResponseField name="direct" type="array">
+      Modules with d=1 impacts
+    </ResponseField>
+    
+    <ResponseField name="indirect" type="array">
+      Modules with d=2+ impacts
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Usage
+
+### Basic Upstream Impact
+
+```javascript
+impact({
+  target: "validateUser",
+  direction: "upstream"
+})
+```
+
+### High-Confidence Analysis
+
+```javascript
+impact({
+  target: "processPayment",
+  direction: "upstream",
+  minConfidence: 0.9,
+  maxDepth: 2
+})
+```
+
+### Include Test Impact
+
+```javascript
+impact({
+  target: "AuthService",
+  direction: "upstream",
+  includeTests: true
+})
+```
+
+### Filter by Relationship Type
+
+```javascript
+impact({
+  target: "validateCard",
+  direction: "upstream",
+  relationTypes: ["CALLS"]
+})
+```
+
+### Multi-Repo Impact
+
+```javascript
+impact({
+  target: "loginHandler",
+  direction: "upstream",
+  repo: "my-app"
+})
+```
+
+## Example Response
+
+```json
+{
+  "risk": "MEDIUM",
+  "summary": {
+    "directCallers": 2,
+    "affectedProcesses": 2,
+    "affectedModules": 1,
+    "totalAffected": 5
+  },
+  "byDepth": {
+    "d1": [
+      {
+        "name": "loginHandler",
+        "type": "Function",
+        "filePath": "src/auth/login.ts",
+        "line": 42,
+        "edgeType": "CALLS",
+        "confidence": 1.0
+      },
+      {
+        "name": "apiMiddleware",
+        "type": "Function",
+        "filePath": "src/api/middleware.ts",
+        "line": 15,
+        "edgeType": "CALLS",
+        "confidence": 1.0
+      }
+    ],
+    "d2": [
+      {
+        "name": "authRouter",
+        "type": "Function",
+        "filePath": "src/routes/auth.ts",
+        "line": 22,
+        "edgeType": "CALLS",
+        "confidence": 0.95
+      }
+    ]
+  },
+  "affected_processes": [
+    {
+      "name": "LoginFlow",
+      "step": 2,
+      "totalSteps": 5
+    },
+    {
+      "name": "TokenRefresh",
+      "step": 1,
+      "totalSteps": 3
+    }
+  ],
+  "affected_modules": {
+    "direct": ["Authentication"],
+    "indirect": ["API"]
+  }
+}
+```
+
+## Risk Assessment Guide
+
+<AccordionGroup>
+  <Accordion title="LOW Risk">
+    **Criteria:**
+    - Less than 5 affected symbols
+    - Few or no affected processes
+    - Single module impact
+    
+    **Action:** Proceed with caution, review d=1 items
+  </Accordion>
+  
+  <Accordion title="MEDIUM Risk">
+    **Criteria:**
+    - 5-15 affected symbols
+    - 2-5 affected processes
+    - Multiple modules
+    
+    **Action:** Careful review, test affected processes
+  </Accordion>
+  
+  <Accordion title="HIGH Risk">
+    **Criteria:**
+    - >15 affected symbols
+    - Many processes affected
+    - Cross-module impact
+    
+    **Action:** Comprehensive testing, consider staged rollout
+  </Accordion>
+  
+  <Accordion title="CRITICAL Risk">
+    **Criteria:**
+    - Critical path affected (auth, payments, core infrastructure)
+    - Widespread impact
+    
+    **Action:** Extensive testing, staged deployment, monitoring plan
+  </Accordion>
+</AccordionGroup>
+
+## Depth Interpretation
+
+| Depth | Risk Level | Meaning | Action Required |
+|-------|-----------|---------|----------------|
+| **d=1** | **WILL BREAK** | Direct callers/importers | Must update these |
+| **d=2** | LIKELY AFFECTED | Indirect dependencies | Review and likely update |
+| **d=3** | MAY NEED TESTING | Transitive effects | Test thoroughly |
+
+## Real-World Examples
+
+### Example 1: Safe Change Analysis
+
+```javascript
+// Task: "Is it safe to change validateUser?"
+impact({
+  target: "validateUser",
+  direction: "upstream",
+  minConfidence: 0.8
+})
+
+// Result:
+// - d=1: 2 direct callers (loginHandler, apiMiddleware)
+// - d=2: 1 indirect (authRouter)
+// - Risk: MEDIUM
+// Action: Update loginHandler and apiMiddleware, test LoginFlow
+```
+
+### Example 2: Critical Infrastructure
+
+```javascript
+// Task: "What breaks if I change the database connection?"
+impact({
+  target: "connectDB",
+  direction: "upstream",
+  maxDepth: 2
+})
+
+// Result:
+// - d=1: 15 direct callers across all modules
+// - Risk: CRITICAL
+// Action: Don't change signature, consider deprecation path
+```
+
+### Example 3: Refactoring Prep
+
+```javascript
+// Task: "I want to split this large function"
+impact({
+  target: "processCheckout",
+  direction: "upstream",
+  includeTests: true
+})
+
+// Result:
+// - d=1: 3 callers + 2 test files
+// - Affected: CheckoutFlow, RefundFlow
+// - Risk: MEDIUM
+// Action: Split function, update 3 callers, fix 2 test files
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always check upstream first">
+    Use `direction: "upstream"` to find what depends on your target. This shows what will break.
+  </Accordion>
+  
+  <Accordion title="Focus on d=1 items">
+    These are guaranteed to break. Review and plan updates for every d=1 item before making changes.
+  </Accordion>
+  
+  <Accordion title="Watch confidence scores">
+    Items with confidence below 0.8 may be false positives. Review these manually.
+  </Accordion>
+  
+  <Accordion title="Check affected processes">
+    Processes reveal the business impact. Breaking "LoginFlow" is more critical than breaking a utility function.
+  </Accordion>
+  
+  <Accordion title="Include tests for refactoring">
+    When refactoring, set `includeTests: true` to know which tests need updates.
+  </Accordion>
+  
+  <Accordion title="Use with detect_changes">
+    After making changes, run `detect_changes()` to verify only expected items were affected.
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+- **Pre-change analysis**: "Is it safe to modify this?"
+- **Refactoring planning**: "What do I need to update?"
+- **Risk assessment**: "How risky is this change?"
+- **Breaking change detection**: "What's the blast radius?"
+- **Test planning**: "What tests will break?"
+
+## Related Tools
+
+- [context](/api/tools/context) - Deep dive on specific affected symbols
+- [detect_changes](/api/tools/detect-changes) - Post-change verification
+- [rename](/api/tools/rename) - Automated refactoring for renames
+
+## Related Resources
+
+- `gitnexus://repo/{name}/processes` - Review affected execution flows
+- `gitnexus://repo/{name}/clusters` - Understand module boundaries

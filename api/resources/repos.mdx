@@ -1,0 +1,122 @@
+---
+title: gitnexus://repos
+description: List all indexed repositories with stats and metadata
+---
+
+## Resource URI
+
+```
+gitnexus://repos
+```
+
+## Description
+
+Returns a list of all repositories indexed by GitNexus. This is a **global resource** — it doesn't require a repository context.
+
+**Read this first** to discover which repositories are available and their current state.
+
+## Returns
+
+<ResponseField name="repos" type="array">
+  List of indexed repositories
+  
+  <Expandable title="properties">
+    <ResponseField name="name" type="string">
+      Repository name (used in all repo-scoped URIs and tool calls)
+    </ResponseField>
+    
+    <ResponseField name="path" type="string">
+      Absolute filesystem path to the repository
+    </ResponseField>
+    
+    <ResponseField name="indexed" type="string">
+      ISO timestamp of last index
+    </ResponseField>
+    
+    <ResponseField name="commit" type="string">
+      Short commit hash (7 chars) at time of indexing
+    </ResponseField>
+    
+    <ResponseField name="files" type="number">
+      Number of files indexed
+    </ResponseField>
+    
+    <ResponseField name="symbols" type="number">
+      Number of code symbols (functions, classes, etc.)
+    </ResponseField>
+    
+    <ResponseField name="processes" type="number">
+      Number of execution flows detected
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## When to Use
+
+- **Before any analysis**: Check which repos are available
+- **Multi-repo setups**: Discover the correct repo name to use in tool calls
+- **Index verification**: Confirm a repo has been indexed
+
+## Example Response
+
+### Single Repository
+
+```yaml
+repos:
+  - name: "my-app"
+    path: "/Users/dev/projects/my-app"
+    indexed: "2024-01-15T14:32:10.123Z"
+    commit: "a1b2c3d"
+    files: 342
+    symbols: 1248
+    processes: 87
+```
+
+### Multiple Repositories
+
+```yaml
+repos:
+  - name: "frontend"
+    path: "/Users/dev/projects/frontend"
+    indexed: "2024-01-15T14:32:10.123Z"
+    commit: "a1b2c3d"
+    files: 342
+    symbols: 1248
+    processes: 87
+  - name: "backend"
+    path: "/Users/dev/projects/backend"
+    indexed: "2024-01-15T13:21:05.456Z"
+    commit: "f4e5d6c"
+    files: 278
+    symbols: 892
+    processes: 64
+
+# Multiple repos indexed. Use repo parameter in tool calls:
+# gitnexus_search({query: "auth", repo: "frontend"})
+```
+
+### No Repositories
+
+```yaml
+repos: []
+# No repositories indexed. Run: gitnexus analyze
+```
+
+## Multi-Repo Context
+
+When multiple repositories are indexed:
+- The response includes a hint about using the `repo` parameter
+- All tools accept an optional `repo` parameter to specify which repository to query
+- Resource URIs use the repo name: `gitnexus://repo/{name}/context`
+
+## Next Steps
+
+After reading this resource:
+
+1. Choose a repository from the list
+2. Read `gitnexus://repo/{name}/context` to get an overview and check staleness
+3. Use tools like `query` or `context` with the `repo` parameter if needed
+
+<Card title="Context Resource" icon="chart-simple" href="/api/resources/context">
+  Check repository stats and staleness
+</Card>

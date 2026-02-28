@@ -1,0 +1,409 @@
+---
+title: Technical Architecture
+description: How GitNexus works under the hood
+---
+
+## System Overview
+
+GitNexus is a **graph-powered code intelligence system** that transforms source code into a queryable knowledge graph.
+
+### Architecture Diagram
+
+```
+┌─────────────────┐
+│  Source Code    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Tree-sitter    │  Parse ASTs
+│   Parsers       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Ingestion      │  Extract symbols,
+│   Pipeline      │  resolve calls/imports
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  KuzuDB Graph   │  Store nodes + edges
+│   Database      │
+└────────┬────────┘
+         │
+         ├──► BM25 Full-Text Search
+         │
+         └──► Semantic Embeddings
+                 │
+                 ▼
+         ┌───────────────┐
+         │  MCP Server   │
+         │  HTTP API     │
+         └───────────────┘
+```
+
+## Tech Stack
+
+### CLI vs Web Comparison
+
+<table>
+  <thead>
+    <tr>
+      <th>Component</th>
+      <th>CLI (Node.js)</th>
+      <th>Web (Browser)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>**Runtime**</td>
+      <td>Node.js ≥18</td>
+      <td>Modern browsers (Chrome, Firefox, Safari)</td>
+    </tr>
+    <tr>
+      <td>**Database**</td>
+      <td>KuzuDB (native) - embedded graph database</td>
+      <td>KuzuDB WASM - browser-compiled version</td>
+    </tr>
+    <tr>
+      <td>**Parser**</td>
+      <td>Tree-sitter native bindings (C)</td>
+      <td>Tree-sitter WASM modules</td>
+    </tr>
+    <tr>
+      <td>**Embeddings**</td>
+      <td>transformers.js + ONNX Runtime (native or CUDA)</td>
+      <td>transformers.js (WebGPU or WASM)</td>
+    </tr>
+    <tr>
+      <td>**Concurrency**</td>
+      <td>Worker threads (parallel parsing)</td>
+      <td>Web Workers (parallel parsing)</td>
+    </tr>
+    <tr>
+      <td>**Storage**</td>
+      <td>`.gitnexus/` directory (filesystem)</td>
+      <td>IndexedDB (browser storage)</td>
+    </tr>
+    <tr>
+      <td>**Memory**</td>
+      <td>8GB heap (auto-allocated)</td>
+      <td>Browser-limited (~2-4GB typical)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Core Technologies
+
+### KuzuDB - Graph Database
+
+[KuzuDB](https://kuzudb.com/) is an **embedded graph database** optimized for knowledge graphs:
+
+**Why KuzuDB?**
+
+- **Embedded** - No separate server process required
+- **Graph-native** - Optimized for relationship traversal
+- **Cypher queries** - Standard graph query language
+- **Fast ingestion** - Bulk CSV loading for millions of nodes/edges
+- **Single-file storage** - Database stored as a single `.kuzu` file
+
+**Schema:**
+
+GitNexus uses a **multi-label node schema**:
+
+- **File nodes** - `File`, `Folder`
+- **Code nodes** - `Function`, `Class`, `Method`, `Interface`, `Struct`, `Enum`, `Trait`, etc.
+- **Grouping nodes** - `Community` (clusters), `Process` (execution flows)
+- **Embedding nodes** - `CodeEmbedding` (semantic vectors)
+
+**Relationships:**
+
+- `CALLS` - Function/method calls
+- `IMPORTS` - Module imports
+- `EXTENDS` - Class inheritance
+- `IMPLEMENTS` - Interface implementation
+- `DEFINES` - File defines symbol
+- `MEMBER_OF` - Symbol belongs to community
+- `STEP_IN_PROCESS` - Symbol is part of execution flow
+
+### Tree-sitter - AST Parsing
+
+[Tree-sitter](https://tree-sitter.github.io/) provides **fast, incremental parsing**:
+
+**Key Features:**
+
+- **Error-tolerant** - Parses incomplete code
+- **Incremental** - Re-parses only changed regions
+- **Language-agnostic** - Consistent API across languages
+- **Native speed** - C implementation with bindings
+
+**Integration:**
+
+- CLI uses `tree-sitter` npm package (native Node.js bindings)
+- Web uses `tree-sitter-wasm` (WebAssembly builds)
+- Each language has a separate parser package (e.g., `tree-sitter-typescript`)
+
+### transformers.js - Embeddings
+
+[transformers.js](https://huggingface.co/docs/transformers.js) runs **Hugging Face models in JavaScript**:
+
+**Model:**
+
+GitNexus uses `snowflake-arctic-embed-xs`:
+
+- **Size**: 22M parameters (~90MB download)
+- **Dimensions**: 384-dimensional vectors
+- **Quality**: Optimized for code and technical text
+- **Speed**: ~1000 embeddings/minute on CPU
+
+**Hardware Acceleration:**
+
+<table>
+  <thead>
+    <tr>
+      <th>Platform</th>
+      <th>Backend</th>
+      <th>Speed</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Windows CLI</td>
+      <td>DirectML (DirectX 12)</td>
+      <td>🚀 GPU-accelerated</td>
+    </tr>
+    <tr>
+      <td>Linux CLI (with CUDA)</td>
+      <td>ONNX Runtime CUDA</td>
+      <td>🚀 GPU-accelerated</td>
+    </tr>
+    <tr>
+      <td>Linux/macOS CLI</td>
+      <td>ONNX Runtime CPU</td>
+      <td>⚡ CPU (still fast)</td>
+    </tr>
+    <tr>
+      <td>Web (Chrome/Edge)</td>
+      <td>WebGPU</td>
+      <td>🚀 GPU-accelerated</td>
+    </tr>
+    <tr>
+      <td>Web (Firefox/Safari)</td>
+      <td>WASM</td>
+      <td>🐢 Slower</td>
+    </tr>
+  </tbody>
+</table>
+
+**Usage:**
+
+Embeddings are **optional** (use `--embeddings` flag). They enable:
+
+- Semantic code search (beyond keyword matching)
+- Similarity-based symbol ranking
+- Hybrid search (BM25 + semantic + RRF fusion)
+
+## Indexing Pipeline
+
+GitNexus builds the knowledge graph through a **6-phase pipeline**:
+
+### Phase 1: Structure (0-20%)
+
+1. **Scan repository** - Walk file tree, collect paths
+2. **Build file graph** - Create `File` and `Folder` nodes
+3. **Detect framework** - Identify project type (React, Django, etc.)
+
+### Phase 2: Parsing (20-60%)
+
+1. **Chunk files** - Group files into 20MB batches
+2. **Parse ASTs** - Extract functions, classes, methods
+3. **Create symbol table** - Register all code symbols
+4. **Worker pool** - Parse in parallel across CPU cores
+
+**Worker Thread Concurrency:**
+
+GitNexus uses **Node.js worker threads** for parallel parsing:
+
+- **Pool size**: `Math.min(8, os.cpus().length - 1)`
+- **Sub-batching**: Files sent to workers in chunks of 1500
+- **Timeout**: 30 seconds per sub-batch
+- **Fallback**: Sequential parsing if workers fail
+
+Each worker:
+1. Receives batch of files
+2. Parses ASTs in isolation
+3. Extracts symbols, calls, imports
+4. Returns structured data to main thread
+
+### Phase 3: Resolution (60-82%)
+
+1. **Import resolution** - Map import statements to files
+2. **Call resolution** - Link function calls to definitions
+3. **Heritage resolution** - Build class hierarchies
+
+**Language-Aware Logic:**
+
+- Builds suffix index for fast path matching
+- Caches resolution results per chunk
+- Handles language-specific module systems
+
+### Phase 4: Communities (82-92%)
+
+Uses **Leiden algorithm** to detect functional clusters:
+
+1. Build weighted graph (call frequency + imports)
+2. Run community detection (modularity optimization)
+3. Assign heuristic labels (e.g., "auth", "api", "ui")
+4. Calculate cohesion scores
+
+### Phase 5: Processes (92-98%)
+
+Traces **execution flows** through call chains:
+
+1. Score entry points (routes, CLI commands, event handlers)
+2. Traverse call graph depth-first
+3. Detect cross-community flows
+4. Label processes by dominant pattern
+
+Output: ~20-300 processes per repo (dynamic limit based on size)
+
+### Phase 6: Search Indexes (98-100%)
+
+1. **KuzuDB bulk load** - CSV import for nodes + edges
+2. **Full-text search** - Create FTS indexes on `name` and `content`
+3. **Embeddings** (optional) - Generate semantic vectors
+
+## Storage Layout
+
+### CLI Storage (`.gitnexus/`)
+
+Each repository stores its index in `.gitnexus/`:
+
+```
+my-project/
+├── .gitnexus/
+│   ├── graph.kuzu          # KuzuDB database file
+│   ├── graph.kuzu.wal      # Write-ahead log
+│   ├── graph.kuzu.lock     # Lock file
+│   └── meta.json           # Index metadata
+├── AGENTS.md               # GitNexus context for AI agents
+└── CLAUDE.md               # Claude-specific context
+```
+
+**Global Registry** (`~/.gitnexus/`):
+
+```
+~/.gitnexus/
+└── registry.json           # List of all indexed repos
+```
+
+### Web Storage (Browser)
+
+The web UI uses **IndexedDB** for client-side storage:
+
+- Database per repository
+- Nodes + edges stored as structured data
+- No filesystem access required
+
+## Query Engine
+
+### Hybrid Search
+
+GitNexus uses **3-tier ranking**:
+
+1. **BM25** - Full-text relevance (KuzuDB FTS)
+2. **Semantic** - Vector similarity (cosine distance)
+3. **RRF** - Reciprocal Rank Fusion to combine scores
+
+**Algorithm:**
+
+```javascript
+RRF_score = Σ (1 / (k + rank_i))
+```
+
+Where `k = 60` (standard RRF constant).
+
+### Process-Grouped Results
+
+Search results are **grouped by execution flow**:
+
+- Symbols in the same process are clustered together
+- Helps AI understand functional context
+- Reduces noise from unrelated matches
+
+## MCP Server
+
+The **Model Context Protocol server** runs via stdio:
+
+```bash
+npx gitnexus mcp
+```
+
+**Multi-Repo Support:**
+
+- Reads `~/.gitnexus/registry.json` at startup
+- Switches active database per tool call
+- Session lock prevents concurrent DB access
+
+**Tools Exposed:**
+
+- `query` - Hybrid search
+- `context` - Symbol 360° view
+- `impact` - Blast radius analysis
+- `detect_changes` - Git diff impact
+- `rename` - Coordinated multi-file rename
+- `cypher` - Raw graph queries
+
+## HTTP API (Optional)
+
+Run a local server for the web UI:
+
+```bash
+gitnexus serve
+```
+
+Provides REST endpoints:
+
+- `GET /repos` - List indexed repos
+- `POST /query` - Run hybrid search
+- `POST /cypher` - Execute Cypher query
+- `GET /schema` - Get graph schema
+
+## Performance Optimizations
+
+### Memory Management
+
+1. **Chunked parsing** - Process 20MB at a time
+2. **AST cache eviction** - LRU cache with size limits
+3. **CSV streaming** - Avoid loading entire graph in memory
+4. **Lazy embedding loading** - Only load model when `--embeddings` used
+
+### Parse Speed
+
+1. **Worker parallelism** - Use all CPU cores
+2. **Sub-batching** - Limit structured clone overhead
+3. **Suffix index** - O(1) import path lookups
+4. **Resolve cache** - Memoize import resolution
+
+### Query Speed
+
+1. **KuzuDB indexing** - Automatic graph indexes
+2. **FTS indexes** - Fast keyword search
+3. **Embedding batching** - Process 200 embeddings at a time
+4. **Connection pooling** - Reuse KuzuDB connections
+
+## Limitations
+
+### Current Constraints
+
+- **Max repo size**: ~50,000 files (memory-limited)
+- **Embedding limit**: 50,000 nodes (auto-skip above this)
+- **WASM performance**: 2-3x slower than native
+- **Dynamic languages**: Limited runtime dispatch resolution
+
+### Known Issues
+
+- ONNX Runtime cleanup segfaults on macOS (CLI force-exits to avoid)
+- Swift parser is optional (may fail to install on some platforms)
+- Minified files are not supported

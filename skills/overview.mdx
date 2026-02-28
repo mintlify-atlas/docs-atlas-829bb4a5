@@ -1,0 +1,193 @@
+---
+title: Agent Skills Overview
+description: Specialized workflows that help AI agents work effectively with GitNexus knowledge graphs
+---
+
+## What Are Agent Skills?
+
+Agent skills are specialized workflow guides that teach AI agents how to effectively use GitNexus for specific development tasks. Each skill provides:
+
+- Clear workflow steps for the task
+- Tool selection guidance
+- Checklists to ensure nothing is missed
+- Resource references for efficient navigation
+- Real-world examples
+
+## Available Skills
+
+GitNexus provides four core skills that cover the most common code intelligence tasks:
+
+<CardGroup cols={2}>
+  <Card title="Exploring" icon="compass" href="/skills/exploring">
+    Navigate unfamiliar code, understand architecture, and trace execution flows
+  </Card>
+  <Card title="Debugging" icon="bug" href="/skills/debugging">
+    Trace bugs through call chains, find error sources, and investigate failures
+  </Card>
+  <Card title="Impact Analysis" icon="radar" href="/skills/impact-analysis">
+    Analyze blast radius, assess safety of changes, and understand dependencies
+  </Card>
+  <Card title="Refactoring" icon="code" href="/skills/refactoring">
+    Rename symbols, extract modules, and restructure code safely across multiple files
+  </Card>
+</CardGroup>
+
+## Automatic Installation
+
+Skills are automatically installed when you run `npx gitnexus analyze` in your repository. This command:
+
+1. Indexes your codebase into a knowledge graph
+2. Installs agent skills to `.claude/skills/gitnexus/`
+3. Creates `AGENTS.md` with skill references
+4. Registers Claude Code hooks (if using Claude Code)
+
+No manual setup required—everything works out of the box.
+
+## Skill Storage Location
+
+Skills are stored in your repository at:
+
+```
+.claude/skills/gitnexus/
+├── gitnexus-exploring/
+│   └── SKILL.md
+├── gitnexus-debugging/
+│   └── SKILL.md
+├── gitnexus-impact-analysis/
+│   └── SKILL.md
+└── gitnexus-refactoring/
+    └── SKILL.md
+```
+
+This `.claude/` directory structure is recognized by:
+- **Claude Code** (full support with skills + hooks)
+- **Cursor** (MCP + skills)
+- **OpenCode** (MCP + skills)
+
+<Note>
+The `.claude/skills/` directory is gitignored by default and regenerated on each `gitnexus analyze` run.
+</Note>
+
+## How Skills Work
+
+When an AI agent encounters a task that matches a skill's description, it:
+
+1. **Loads the skill** from `.claude/skills/gitnexus/`
+2. **Follows the workflow** defined in the skill
+3. **Uses GitNexus tools** as guided by the skill
+4. **Checks off items** from the skill's checklist
+5. **Delivers complete results** without missing context
+
+### Example Workflow
+
+User asks: "How does authentication work?"
+
+1. Agent recognizes this matches the **Exploring** skill
+2. Reads `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md`
+3. Follows the exploration workflow:
+   - Reads `gitnexus://repo/{name}/context` for overview
+   - Uses `gitnexus_query({query: "authentication"})` to find related flows
+   - Uses `gitnexus_context` for deep dives on specific symbols
+   - Reads process resources for execution traces
+4. Returns comprehensive explanation of auth architecture
+
+## Workflow Philosophy
+
+All GitNexus skills follow a consistent pattern:
+
+### Always Start with Context
+
+```
+READ gitnexus://repo/{name}/context → Check staleness, get stats
+```
+
+This lightweight read (~150 tokens) tells you:
+- How many symbols are indexed
+- Whether the index is stale
+- What tools are available
+
+<Warning>
+If the context shows "Index is stale", run `npx gitnexus analyze` in the terminal before continuing.
+</Warning>
+
+### Use Smart Tools, Not Raw Queries
+
+GitNexus tools return **pre-structured intelligence** instead of raw graph data:
+
+- `query` → Process-grouped execution flows (not raw symbol matches)
+- `context` → Categorized references + process participation (not raw edges)
+- `impact` → Depth-grouped blast radius with confidence (not raw dependencies)
+
+This means:
+- Agents get complete context in 1 query (not 5-10)
+- Smaller LLMs work effectively (tools do the heavy lifting)
+- Results are consistent and reliable
+
+### Follow the Checklist
+
+Each skill provides a checklist to ensure thorough analysis:
+
+```
+- [ ] READ gitnexus://repo/{name}/context
+- [ ] gitnexus_query for the concept
+- [ ] Review returned processes
+- [ ] gitnexus_context on key symbols
+- [ ] READ process resource for traces
+- [ ] Read source files for details
+```
+
+## Integration with Editors
+
+### Claude Code (Full Support)
+
+Claude Code gets the deepest integration:
+- ✅ MCP tools for knowledge graph queries
+- ✅ Agent skills loaded automatically
+- ✅ PreToolUse hooks that enrich grep/glob/bash with graph context
+
+### Cursor (MCP + Skills)
+
+Cursor supports:
+- ✅ MCP tools via `~/.cursor/mcp.json`
+- ✅ Skills via `.claude/skills/` directory
+- ⚠️ No automatic hooks (manual workflow required)
+
+### OpenCode (MCP + Skills)
+
+OpenCode supports:
+- ✅ MCP tools via `~/.config/opencode/config.json`
+- ✅ Skills via `.claude/skills/` directory
+- ⚠️ No automatic hooks
+
+### Windsurf (MCP Only)
+
+Windsurf supports:
+- ✅ MCP tools only
+- ❌ No skill loading
+- ❌ No hooks
+
+## When to Use Which Skill
+
+| User Intent | Skill to Use | Example Questions |
+|-------------|--------------|-------------------|
+| Understand how code works | **Exploring** | "How does X work?", "What's the architecture?", "Show me the auth flow" |
+| Debug an issue | **Debugging** | "Why is X failing?", "Trace this error", "Who calls this?" |
+| Assess change safety | **Impact Analysis** | "What breaks if I change X?", "Is this safe?", "Show blast radius" |
+| Refactor code | **Refactoring** | "Rename this function", "Extract this module", "Split this service" |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Exploring Code" icon="compass" href="/skills/exploring">
+    Learn how to navigate unfamiliar codebases and understand execution flows
+  </Card>
+  <Card title="Debugging Workflow" icon="bug" href="/skills/debugging">
+    Master the techniques for tracing bugs through the knowledge graph
+  </Card>
+  <Card title="Impact Analysis" icon="radar" href="/skills/impact-analysis">
+    Understand how to assess blast radius before making changes
+  </Card>
+  <Card title="Refactoring Safely" icon="code" href="/skills/refactoring">
+    Learn safe refactoring patterns with automated rename and dependency mapping
+  </Card>
+</CardGroup>
